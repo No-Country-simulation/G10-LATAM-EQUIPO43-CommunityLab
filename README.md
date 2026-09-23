@@ -19,6 +19,9 @@ flowchart LR
 
 Flujo general: interacciones (Discord/Slack/JSON/CSV) → análisis con LLM (sentimiento, tema y relevancia) → activos generados (Post LinkedIn + Newsletter/FAQ) → revisión y curaduría (aprobación en Streamlit) → salida y almacenamiento (salida de activos y almacenamiento en OCI Object Storage).
 
+## Flujo de trabajo (Git)
+Recordar no hacer push directo a main, todo por rama + pull requests
+
 ## Stack
 - **LLM**: Google Gemini
 - **Orquestación**: N8N (self-hosted en VM OCI)
