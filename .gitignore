@@ -1,5 +1,88 @@
-.env
+```gitignore
+# =========================
+# Python
+# =========================
+
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
 .venv/
 venv/
+env/
+ENV/
+
+# =========================
+# Environment / secrets
+# =========================
+
+.env
+.env.*
+!.env.example
+
+# =========================
+# IDEs / editors
+# =========================
+
+.vscode/
+.idea/
+*.code-workspace
+
+# =========================
+# OS files
+# =========================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Python packaging
+# =========================
+
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Testing / coverage
+# =========================
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# =========================
+# Jupyter
+# =========================
+
+.ipynb_checkpoints/
+
+# =========================
+# Streamlit
+# =========================
+
+.streamlit/secrets.toml
+
+# =========================
+# Logs
+# =========================
+
+*.log
+
+# =========================
+# Local data / generated files
+# =========================
+
+
+output/
+outputs/
+storage/
+```
+
+
+salidas/
