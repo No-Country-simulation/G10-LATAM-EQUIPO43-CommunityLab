@@ -1,8 +1,21 @@
 import os
 import discord
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
+
+N8N_ENV = os.getenv("N8N_ENV", "test")
+
+N8N_WEBHOOK_URL = (
+    os.getenv("N8N_WEBHOOK_TEST")
+    if N8N_ENV == "test"
+    else os.getenv("N8N_WEBHOOK_PROD")
+)
+
+CANALES_PERMITIDOS = {1552066129311047750} # general
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -17,6 +30,12 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
+    if message.author == client.user:
+        return
+    
+    if message.channel.id not in CANALES_PERMITIDOS:
+        return
+
     if message.author.bot:
         return
 
@@ -35,7 +54,7 @@ async def on_message(message):
     )
 
     response = requests.post(
-        "https://granite-alone-useable.ngrok-free.dev/webhook/discord-message",
+        N8N_WEBHOOK_URL,
         json={
             "type": "mention" if es_mencion else "message",
             "message_id": str(message.id),
