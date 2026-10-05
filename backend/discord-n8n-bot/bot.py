@@ -38,6 +38,7 @@ async def on_message(message):
         "https://granite-alone-useable.ngrok-free.dev/webhook/discord-message",
         json={
             "type": "mention" if es_mencion else "message",
+            "message_id": str(message.id),
             "channel_id": str(message.channel.id),
             "channel_name": message.channel.name,
             "user_id": str(message.author.id),
