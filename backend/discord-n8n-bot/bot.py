@@ -44,9 +44,10 @@ async def on_message(message):
     contenido = message.content
 
     if es_mencion:
-        contenido = contenido.replace(
-            f"<@{client.user.id}>", ""
-        ).strip()
+        contenido = contenido.replace(f"<@{client.user.id}>", "").strip()
+
+    if not contenido:
+        return
 
     print(
         f"[{message.channel.name}] "
@@ -71,6 +72,8 @@ async def on_message(message):
     print("Respuesta de n8n:", response.status_code)
 
     if es_mencion and response.ok:
+        print("Respuesta n8n:", repr(response.text))
+        print("Content-Type:", response.headers.get("Content-Type"))
         data = response.json()
 
         if isinstance(data, list):
