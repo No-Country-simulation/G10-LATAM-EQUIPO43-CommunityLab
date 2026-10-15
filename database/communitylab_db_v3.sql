@@ -1,7 +1,5 @@
 BEGIN;
 
-BEGIN;
-
 CREATE TABLE fuente (
     id_fuente       BIGSERIAL PRIMARY KEY,
     nombre          VARCHAR(150) NOT NULL,
@@ -422,5 +420,99 @@ WHERE a.estado_procesamiento = 'pendiente'
 ORDER BY a.creado_en;
 
 COMMENT ON VIEW v_actividades_pendientes IS 'Cola para el job batch: actividades pendientes de análisis.';
+
+
+CREATE OR REPLACE FUNCTION public.communitylab_editar_activo(
+    p_id_activo BIGINT,
+    p_contenido JSONB,
+    p_motivo_cambio TEXT,
+    p_creado_por VARCHAR(150)
+)
+RETURNS TABLE (
+    id_activo BIGINT,
+    id_lote BIGINT,
+    tipo_activo VARCHAR(50),
+    estado_curaduria VARCHAR(30),
+    id_version_actual BIGINT,
+    id_version_aprobada BIGINT,
+    actualizado_en TIMESTAMPTZ,
+    numero_version INTEGER,
+    origen_version VARCHAR(20),
+    contenido JSONB,
+    motivo_cambio TEXT,
+    creado_por VARCHAR(150),
+    creado_en TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_activo activo_generado%ROWTYPE;
+    v_numero_version INTEGER;
+    v_id_version BIGINT;
+BEGIN
+    SELECT ag.*
+      INTO v_activo
+      FROM activo_generado AS ag
+     WHERE ag.id_activo = p_id_activo
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+
+    IF v_activo.estado_curaduria = 'publicado' THEN
+        RETURN;
+    END IF;
+
+    SELECT COALESCE(MAX(va.numero_version), 0) + 1
+      INTO v_numero_version
+      FROM version_activo AS va
+     WHERE va.id_activo = p_id_activo;
+
+    INSERT INTO version_activo (
+        id_activo,
+        numero_version,
+        contenido,
+        origen_version,
+        motivo_cambio,
+        creado_por
+    )
+    VALUES (
+        p_id_activo,
+        v_numero_version,
+        p_contenido,
+        'usuario',
+        p_motivo_cambio,
+        p_creado_por
+    )
+    RETURNING version_activo.id_version INTO v_id_version;
+
+    UPDATE activo_generado AS ag
+       SET contenido = p_contenido,
+           id_version_actual = v_id_version,
+           actualizado_en = NOW(),
+           estado_curaduria = 'borrador'
+     WHERE ag.id_activo = p_id_activo;
+
+    RETURN QUERY
+    SELECT
+        ag.id_activo,
+        ag.id_lote,
+        ag.tipo_activo,
+        ag.estado_curaduria,
+        ag.id_version_actual,
+        ag.id_version_aprobada,
+        ag.actualizado_en,
+        va.numero_version,
+        va.origen_version,
+        va.contenido,
+        va.motivo_cambio,
+        va.creado_por,
+        va.creado_en
+    FROM activo_generado AS ag
+    JOIN version_activo AS va ON va.id_version = v_id_version
+    WHERE ag.id_activo = p_id_activo;
+END;
+$$;
 
 COMMIT;

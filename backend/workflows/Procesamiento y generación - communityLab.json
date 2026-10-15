@@ -42,11 +42,12 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Formato de entrada que recibirás:\nAutor: {{ $json.evidencias.testimonios_logros[0].autor }}\nInsight (tema libre): {{ $('Code: Preparar Análisis para W3').item.json.analisis.resultado_json.tema_libre }}\nCita destacada: {{ $('Code: Preparar Análisis para W3').item.json.analisis.resultado_json.cita_extraida }}\nTexto original: {{ $('W4.2. Consolidar Análisis del Lote').item.json.interacciones_analizadas[0].texto_original }}",
+        "text": "=Genera el post de LinkedIn a partir de este lote de la comunidad:\n\n{{ JSON.stringify($json, null, 2) }}",
+        "hasOutputParser": true,
         "messages": {
           "messageValues": [
             {
-              "message": "=Eres el copywriter de una comunidad tech que celebra los logros de sus\nestudiantes. A partir del insight que te entrego, escribe un post para\nLinkedIn con tono inspirador y profesional, que celebre el logro y motive\na otros miembros de la comunidad a seguir esforzándose.\n\nReglas:\n- Máximo 150 palabras.\n- Incluye 2-3 hashtags relevantes al final.\n- Usa el nombre del autor tal como viene en el dato.\n- Si hay una cita textual extraída, intégrala naturalmente en el post.\n- No inventes datos que no estén en el insight (empresa, puesto exacto,\n  cifras) salvo que vengan explícitos en el texto original.\n\nResponde solo con el texto del post, sin explicaciones adicionales."
+              "message": "=Eres el copywriter de la cuenta oficial de LinkedIn de una comunidad de aprendizaje en tecnología (programa ONE). Conviertes experiencias reales de miembros de la comunidad en publicaciones auténticas y útiles, siempre fieles a lo que la persona realmente dijo.\n\nDATOS DE ENTRADA\nRecibirás un JSON con el lote de la comunidad:\n- origen_comunidad, id_lote o periodo_referencia\n- opciones (opcional): idioma y tono\n- resumen_comunidad: total_interacciones_procesadas y temas_principales\n- evidencias.testimonios_logros: lista de { autor, texto_original }\n- evidencias.preguntas_dudas: lista de { autor, texto_original }\n\nQUÉ HACER\n1. Elige UNA evidencia de testimonios_logros como protagonista del post: la más específica (qué hizo, con qué herramienta o enfoque, qué resultado) y con más valor para otros miembros.\n2. Clasifica esa experiencia en un solo tipo (si mezcla varios, elige el que la persona presenta como lo principal):\n   - logro_laboral: contratación, ascenso, oferta, entrevista o avance en un proceso de selección.\n   - experiencia_proyecto: un proyecto que construyó, entregó o presentó.\n   - aprendizaje_tecnico: un concepto o herramienta que aprendió o aplicó.\n   - testimonio_formacion: el impacto del curso o de la comunidad en su camino, sin un hito concreto.\n3. Escribe el post con el tono y la estructura del tipo:\n   - logro_laboral → Tono: cálido y orgulloso, sin exagerar. Estructura: (a) el hito en una frase como gancho; (b) qué lo hizo posible, según la persona; (c) el papel del programa o la comunidad, solo si lo menciona; (d) mensaje de ánimo para quien está en un camino parecido.\n   - experiencia_proyecto → Tono: práctico y concreto. Estructura: (a) qué construyó; (b) herramientas o enfoque que mencionó; (c) la dificultad o el aprendizaje que compartió, solo si lo dijo; (d) invitación a compartir proyectos propios.\n   - aprendizaje_tecnico → Tono: didáctico, claro y curioso. Estructura: (a) el concepto o herramienta; (b) qué logró entender o aplicar; (c) por qué puede ser útil a otros; (d) una pregunta abierta a la comunidad.\n   - testimonio_formacion → Tono: auténtico y cercano. Estructura: (a) una frase genuina de la persona, citada literal, como gancho; (b) el impacto que describe; (c) agradecimiento e invitación a participar.\n4. preguntas_dudas: úsalas solo como contexto cuando conecten de forma natural con el tema del post. Nunca presentes una duda como resuelta ni inventes una respuesta. Si no encajan, ignóralas.\n\nREGLAS DE FIDELIDAD (obligatorias)\n- Usa únicamente lo que dicen texto_original y los datos del lote. No inventes empresas, puestos, fechas, cifras, resultados ni herramientas.\n- Respeta el alcance real: una entrevista no es una contratación, avanzar de etapa no es ser seleccionado, un proyecto en curso no es un proyecto terminado, aprender algo no es dominarlo.\n- Las citas deben ser literales, entre comillas y de máximo 25 palabras. Fuera de las citas, parafrasea.\n- Nombra a la persona exactamente como aparece en autor.\n- No mezcles en el post historias de otras personas. temas_principales solo puede servir como contexto general.\n- Evita expresiones exageradas (\"increíble\", \"revolucionario\") y promesas de resultados para terceros.\n- Respeta la intensidad de lo dicho: no conviertas \"me costó\" en \"lo más difícil\" ni afirmes dominio o experticia (\"dominio de\", \"experto en\") que la persona no declaró.\n- El titulo refleja lo que la persona vivió o aprendió. No prometas un tutorial (\"Cómo hacer...\") si el post cuenta una experiencia.\n\nESTILO\n- Idioma: el indicado en opciones.idioma; si no viene, español. Si opciones.tono viene informado, úsalo como matiz sin contradecir las reglas de fidelidad.\n- Entre 80 y 150 palabras en copy, en párrafos cortos (1 a 3 líneas), con máximo 2 emojis.\n- No incluyas hashtags dentro de copy; van en el campo hashtags (3 a 4, relacionados con los temas o herramientas mencionados).\n- titulo: máximo 90 caracteres, descriptivo, sin clickbait.\n\npotencial_engagement\n- Alto: hito concreto, detalle específico (herramienta, resultado o aprendizaje claro) y carga emocional o utilidad evidente.\n- Medio: concreto, pero con poco detalle o poca carga emocional.\n- Bajo: genérico o poco específico.\n\nFORMATO DE SALIDA\nResponde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni bloques de código:\n{\n  \"titulo\": \"string\",\n  \"copy\": \"string\",\n  \"canal_recomendado\": \"LinkedIn Oficial\",\n  \"potencial_engagement\": \"Alto | Medio | Bajo\",\n  \"hashtags\": [\"#Ejemplo\"],\n  \"origen_interacciones\": [\"autor tal como viene\"],\n  \"tipo_experiencia\": \"logro_laboral | experiencia_proyecto | aprendizaje_tecnico | testimonio_formacion\"\n}\nDentro de copy, separa los párrafos con \\n\\n para que el JSON sea válido.\n\nSIN MATERIAL UTILIZABLE\nSi testimonios_logros está vacío o ninguna evidencia permite un post fiel, responde con titulo y copy vacíos, hashtags y origen_interacciones vacíos, canal_recomendado \"LinkedIn Oficial\", potencial_engagement \"Bajo\", \"omitido\": true y \"motivo\" con una frase breve que explique por qué.\n\nEJEMPLOS\n\nEjemplo 1\nEntrada (fragmento):\nevidencias.testimonios_logros = [{\"autor\": \"Tomás Vega\", \"texto_original\": \"Hoy me confirmaron que paso a la siguiente etapa del proceso para una posición de analista de datos. Lo que más me ayudó fue el proyecto de dashboards del curso.\"}]\nSalida:\n{\"titulo\": \"Un proyecto de dashboards, una nueva etapa de selección\", \"copy\": \"Un paso más en el camino 🚀\\n\\nTomás Vega nos contó que avanzó a la siguiente etapa del proceso para una posición de analista de datos. Según él, lo que más le ayudó fue el proyecto de dashboards que construyó durante el curso.\\n\\nEl proceso sigue en marcha, y justo por eso vale la pena celebrar el avance: cada etapa superada también cuenta y puede inspirar a quienes están en un camino parecido.\\n\\n¡Mucho éxito en lo que viene, Tomás! Y si estás armando tu portafolio, cuéntanos en qué proyecto estás trabajando.\", \"canal_recomendado\": \"LinkedIn Oficial\", \"potencial_engagement\": \"Medio\", \"hashtags\": [\"#AnálisisDeDatos\", \"#Portafolio\", \"#ComunidadTech\"], \"origen_interacciones\": [\"Tomás Vega\"], \"tipo_experiencia\": \"logro_laboral\"}\n\nEjemplo 2\nEntrada (fragmento):\nevidencias.testimonios_logros = [{\"autor\": \"Elena Cruz\", \"texto_original\": \"Terminé mi primer chatbot con RAG usando los documentos de mi curso. Lo más difícil fue ajustar el tamaño de los fragmentos, pero al final responde bastante bien.\"}]\nSalida:\n{\"titulo\": \"Del curso a un chatbot con RAG que responde\", \"copy\": \"Del curso a un chatbot que responde 💬\\n\\nElena Cruz compartió que terminó su primer chatbot con RAG, construido a partir de los documentos de su curso. Lo más difícil, según ella, fue ajustar el tamaño de los fragmentos de texto; aun así, cuenta que \\\"responde bastante bien\\\".\\n\\nEse tipo de ajuste fino es justo lo que se aprende construyendo, y compartirlo ayuda a que otras personas se animen a empezar el suyo.\\n\\n¿Estás trabajando en tu propio proyecto con RAG? Cuéntanos qué te ha costado más y qué has probado hasta ahora.\", \"canal_recomendado\": \"LinkedIn Oficial\", \"potencial_engagement\": \"Alto\", \"hashtags\": [\"#RAG\", \"#IAGenerativa\", \"#ComunidadTech\"], \"origen_interacciones\": [\"Elena Cruz\"], \"tipo_experiencia\": \"experiencia_proyecto\"}"
             }
           ]
         },
@@ -63,70 +64,6 @@
     },
     {
       "parameters": {
-        "content": "# 🟨 FASE 1: INGESTA, VALIDACIÓN Y PARSEO\n\n**Descripción:**\n\nRecepción de solicitudes de la comunidad mediante HTTP Webhook, validación estricta del esquema según el Contrato de Datos v1.0, filtrado de errores e individualización de los mensajes para posterior análisis.\n\n\n### 📥 CONTRATO DE ENTRADA (Input Data)\n* **Origen:** Request HTTP POST (JSON Payload via Webhook / Postman).\n* **Campos requeridos:**\n  • `origen_comunidad` (string, no vacío)\n  • `periodo_referencia` (string, no vacío)\n  • `interacciones` (array de objetos, min: 1 elemento)\n  • `interacciones[].texto` (string, no vacío)\n\n\n### ⚙️ LÓGICA DE PROCESAMIENTO\n1. **Recepción:** Captura el payload en crudo.\n2. **Validación:** Comprueba la presencia de las claves requeridas y su tipo de dato.\n3. **Bifurcación (IF):**\n   * **RAMA TRUE:** Separa el array `interacciones` en ítems individuales (Split Out) y normaliza los metadatos al modelo de datos temporal.\n   * **RAMA FALSE:** Retorna respuesta HTTP 400 Bad Request con el detalle del error.\n\n\n### 📤 CONTRATO DE SALIDA / CONTINUIDAD (Output Data)\n* **Salida exitosa (True):** Colección de ítems individuales de interacción con campos normalizados (`autor`, `canal`, `texto`, `origen_comunidad`, `periodo_referencia`).\n* **Salida fallida (False):** Respuesta HTTP con código 400 indicando `es_valido: false` y arreglo de `errores[]`.",
-        "height": 624,
-        "width": 1840,
-        "color": "#3B1853"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        -960,
-        -560
-      ],
-      "typeVersion": 1,
-      "id": "d4b4c738-abc8-42c6-a8eb-18bf0d142802",
-      "name": "Sticky Note"
-    },
-    {
-      "parameters": {
-        "content": "# 🟦 FASE 2: PROCESAMIENTO & ANÁLISIS LLM\n\n**Descripción:**\n\nAnálisis semántico de las interacciones normalizadas. Extrae sentimientos, temas clave y categoriza cada interacción para su posterior consolidación en lote.\n\n\n### 📥 CONTRATO DE ENTRADA (Input Data)\n* **Origen:** Colección de ítems individuales desglosados (Split Out).\n* **Formato:** JSON con campos normalizados (`autor`, `canal`, `texto`, `origen_comunidad`, `periodo_referencia`).\n\n\n### ⚙️ LÓGICA Y MODOS DE EJECUCIÓN\n* **Modo Producción (Agente IA):** Nodo `Analista de Contenido...` (conecta sub-cadena LLM + Output Parser).\n* **Modo Desarrollo / Pruebas (Mock):** Nodo `Mock Analista LLM` (Inyecta datos ficticios válidos para evitar gasto de tokens o fallos de prompt).\n\n\n### 📤 CONTRATO DE SALIDA (Output Data)\n* **Objeto Enriquecido:** Cada ítem recibe el objeto `analisis` con la estructura:\n  • `sentimiento`: \"Positivo\" | \"Neutro\" | \"Negativo\"\n  • `tipo_insight`: \"testimonio\" | \"pregunta_tecnica\" | \"feedback\"\n  • `temas`: Array de strings\n  • `relevancia`: \"Alta\" | \"Media\" | \"Baja\"",
-        "height": 608,
-        "width": 800,
-        "color": "#4E5373"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        992,
-        -528
-      ],
-      "typeVersion": 1,
-      "id": "7948dc48-5f90-4c2b-bf7f-8ede91c486ea",
-      "name": "Sticky Note1"
-    },
-    {
-      "parameters": {
-        "content": "# 🟩 FASE 3: EVALUACIÓN Y GENERACIÓN DE ACTIVOS (BRANCHING)\n\n**Descripción:**\n\nEvalúa los resultados del análisis y las banderas del payload (`opciones`) para determinar qué activos de distribución redactar (Post LinkedIn, Destaque Newsletter y/o FAQ Técnico). Si ningún activo es requerido, omite el consumo de IA.\n\n---\n\n### 📥 CONTRATO DE ENTRADA (Input Data)\n* **Origen:** Objeto consolidado del lote de la Fase 2 (`Consolidar Analisis Lote`).\n* **Datos Clave Evaluados:**\n  • `evidencias.testimonios_logros` (array de ítems)\n  • `evidencias.preguntas_dudas` (array de ítems)\n  • `opciones.generar_activos` (override explícito: `[\"LINKEDIN\", \"NEWSLETTER\", \"FAQ\"]`)\n\n---\n\n### ⚙️ LÓGICA Y BIFURCACIÓN\n1. **Evaluador de Activos (Branching):** Calcula banderas booleanas:\n   • `generar_linkedin`: (Testimonios > 0)\n   • `generar_newsletter`: (Testimonios > 0)\n   • `generar_faq`: (Preguntas/Dudas > 0)\n2. **Conmutador / Rutas:**\n   * **Sin Activos (0):** Pasa directo al ensamblador sin consumir LLM.\n   * **Con Activos (1 a 3):** Dispara en paralelo los agentes LLM de redacción activados.\n\n---\n\n### 📤 CONTRATO DE SALIDA (Output Data)\n* **Texto Redactado:** Cada sub-agente retorna su correspondiente texto formateado (`post_linkedin`, `destaque_newsletter`, `faq_tecnico`) para su posterior empaquetado final.",
-        "height": 608,
-        "width": 1024,
-        "color": "#172B1B"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        2448,
-        -384
-      ],
-      "typeVersion": 1,
-      "id": "16dfb343-8b1e-4290-9e00-5e7a7ac81141",
-      "name": "Sticky Note2"
-    },
-    {
-      "parameters": {
-        "content": "# 🟪 FASE 4: ENSAMBLE, PERSISTENCIA EN OCI Y RESPUESTA HTTP\n\n**Descripción:**\n\nRecopila los activos generados, construye el paquete de distribución estandarizado del MVP, persiste el archivo JSON en el Bucket Always Free de OCI Object Storage y retorna la respuesta HTTP final al cliente.\n\n### 📥 CONTRATO DE ENTRADA (Input Data)\n* **Origen:** Sub-rutas activas de la Fase 3 de generación de activos (LinkedIn, Newsletter, FAQ) o la rama directa \"Sin activos\".\n* **Estructura esperada:** Textos procesados y resúmenes estructurados del análisis semántico.\n\n### ⚙️ LÓGICA DE PROCESAMIENTO\n1. **Merge:** Unifica el flujo principal de generación de contenidos.\n2. **Ensamble:** Formatea la respuesta bajo el esquema oficial del Contrato de Datos v1.0 (claves: `status`, `resumen_comunidad`, `activos_distribucion_generados`, `almacenamiento_oci`, `meta`).\n3. **Persistencia OCI:** Sube el JSON formateado a Oracle Cloud Infrastructure (vía API compatible S3) en la ruta `activos/{{periodo_referencia}}/paquete-{{timestamp}}.json`.\n4. **Actualización de Estado:** Setea `almacenamiento_oci.status = \"guardado_con_exito\"` si la API HTTP responde 200/201 (o `\"error\"` en caso de fallo)].\n5. **Respuesta HTTP:** Entrega el JSON empaquetado al cliente Webhook emisor con código de estado HTTP 200.\n\n\n### 📤 CONTRATO DE SALIDA (Output Data)\n* **Respuesta HTTP 200 (OK):** JSON completo con confirmación de análisis, contenido de activos generados y URI/status del objeto persistido en OCI Object Storage.",
-        "height": 608,
-        "width": 1280,
-        "color": "#4F2353"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "position": [
-        3536,
-        -400
-      ],
-      "typeVersion": 1,
-      "id": "42488d7d-82ce-49a1-ae9e-d9e7dc8f026b",
-      "name": "Sticky Note3"
-    },
-    {
-      "parameters": {
         "jsCode": "/**\n * Continuar cuando no hay activos a generar (o para forzar construcción).\n * Emite un item que permite al Merge/Construir cerrar el flujo.\n */\nconst input = $input.first().json;\nconst d = input.decisiones_branching || {};\nconst alguno = d.generar_linkedin || d.generar_newsletter || d.generar_faq;\n\nif (alguno) {\n  // Hay ramas activas: no emitir aquí (las cubren los generadores)\n  return [];\n}\n\n// Ningún activo: emitir marcador para que Construir genere respuesta vacía de activos\nreturn [{\n  json: {\n    status: \"no_requerido\",\n    rama: \"ninguno\",\n    ...input\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
@@ -140,41 +77,25 @@
     },
     {
       "parameters": {
-        "content": "# 🟧 SANDBOX DE MOCKS (MODO PRUEBAS Y DESARROLLO)\n\n**Propósito:**\nPermite ejecutar y verificar el workflow de extremo a extremo sin consumir tokens de LLM ni requerir credenciales activas de OCI Object Storage.\n\n\n### 📋 MOCKS INCLUIDOS EN EL SANDBOX\n\n1. **`Mock Analista LLM` (Fase 2):**\n   * Simula la extracción de sentimientos, temas e insights del análisis semántico[cite: 4].\n2. **`Mock Generacion de Activos` (Fase 3):**\n   * Simula banderas booleanas (`generar_linkedin`, `generar_newsletter`, `generar_faq`) para evaluar los 8 posibles escenarios de branching/rutas paralelas.\n3. **`Mock Subida OCI` (Fase 4):**\n   * Simula el response HTTP 200 de la API S3/OCI (`ETag`, `Location`, `requestId`) sin realizar conexiones de red externas.\n\n\n### 🛠️ CONEXIÓN RÁPIDA DE MOCK OCI\n* **Producción:** `Ensamble Paquete` $\\rightarrow$ `Subir Paquete a OCI` $\\rightarrow$ `Actualizar Estado` $\\rightarrow$ `HTTP Response`.\n* **Modo Offline:** `Ensamble Paquete` $\\rightarrow$ `Mock Subida OCI` $\\rightarrow$ `Actualizar Estado` $\\rightarrow$ `HTTP Response`.",
-        "height": 452,
-        "width": 1920,
-        "color": "#A93D3D"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        -416,
-        1792
-      ],
-      "id": "1fa1424a-42fd-40b6-9f57-1ac55797233a",
-      "name": "Sticky Note - Mocks y Merge"
-    },
-    {
-      "parameters": {
         "jsCode": "\n/**\n * MOCK DE PRUEBA\n * Simula la salida del Analista LLM.\n * Mantiene los datos de entrada y devuelve el contrato esperado.\n */\n\nconst items = $input.all();\n\nconst temasEjemplo = [\n  [\"Logros y empleos\", \"Oracle Cloud (OCI)\"],\n  [\"Dudas n8n\", \"LangGraph\"],\n  [\"Despliegue OCI\", \"Always Free\"],\n  [\"Dudas técnicas\", \"OCI Storage\"],\n  [\"Feedback de cursos\", \"Prompt Engineering\"],\n  [\"Experiencia de aprendizaje\", \"Comunidad\"]\n];\n\nconst tiposEjemplo = [\n  \"testimonio\",\n  \"pregunta_tecnica\",\n  \"logro\",\n  \"duda\",\n  \"feedback\",\n  \"otro\"\n];\n\nreturn items.map((item, index) => {\n  const json = item.json;\n\n  // El nodo anterior entrega \"contenido\".\n  // \"texto\" se conserva como alternativa por compatibilidad.\n  const contenido = String(\n    json.contenido ?? json.texto ?? \"\"\n  ).trim();\n\n  const fragmento = contenido\n    ? contenido.slice(0, 180)\n    : \"Contenido no disponible para la prueba.\";\n\n  const resumen = contenido\n    ? `Análisis simulado de la interacción: ${contenido.slice(0, 120)}`\n    : \"No fue posible generar un resumen porque la actividad no contiene texto.\";\n\n  return {\n    json: {\n      ...json,\n\n      status: \"exito\",\n\n      analisis: {\n        sentimiento: index % 3 === 0\n          ? \"Positivo\"\n          : index % 3 === 1\n            ? \"Neutro\"\n            : \"Negativo\",\n\n        relevancia: [\"Alta\", \"Media\", \"Baja\"][index % 3],\n\n        tipo_insight: tiposEjemplo[\n          index % tiposEjemplo.length\n        ],\n\n        temas: temasEjemplo[\n          index % temasEjemplo.length\n        ],\n\n        resumen,\n\n        evidencia_clave: fragmento\n      }\n    }\n  };\n});\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        752,
-        1856
+        816,
+        1536
       ],
       "id": "6feda92e-8c6e-454b-bd93-c3b74c9db8ca",
       "name": "Mock Analista LLM"
     },
     {
       "parameters": {
-        "jsCode": "/**\n * CONSTRUCTOR DE PAQUETE FINAL - CommunityLab (Nodo 9)\n * Compatible con Merge en modo Append o passthrough.\n * Procesa todos los ítems recibidos sin importar si provienen de 1, 2 o 3 generadores.\n */\n\nconst contextoBase = $('W4.2. Consolidar Análisis del Lote').first()?.json || {};\nconst itemsEntrada = $input.all();\n\n// Estructura por defecto para activos no requeridos o no generados\nlet postLinkedin = { status: \"no_requerido\" };\nlet destaqueNewsletter = { status: \"no_requerido\" };\nlet sugerenciaFAQ = { status: \"no_requerido\" };\n\n// Recorrer los elementos entregados por el nodo Merge\nfor (const item of itemsEntrada) {\n  let datos = item.json;\n\n /* // Si el generador devolvió el contenido dentro del string 'text', parsearlo\n  if (datos.text && typeof datos.text === 'string') {\n    try {\n      datos = JSON.parse(datos.text);\n    } catch (e) {\n      datos = { status: \"error_parseo\", raw: datos.text };\n    }\n  */\n\n  // Identificar el tipo de activo según su contenido\n  if (datos.text) {$input.first().json.text\n    postLinkedin = datos;\n  } else if (datos.seccion || datos.titular) {\n    destaqueNewsletter = datos;\n  } else if (datos.tema || datos.contenido_sugerido || datos.origen) {\n    sugerenciaFAQ = datos;\n  }\n}\n\n// Construir metadatos y ruta para OCI\nconst fechaISO = new Date().toISOString();\nconst timestamp = fechaISO.replace(/[:.-]/g, '');\nconst periodoRef = (contextoBase.periodo_referencia || 'semana_actual').toLowerCase().replace(/\\s+/g, '_');\nconst rutaObjetoOCI = `activos/${periodoRef}/paquete-${timestamp}.json`;\n\nconst paqueteFinal = {\n  status: \"exito\",\n  origen_comunidad: contextoBase.origen_comunidad || \"Comunidad_General\",\n  periodo_referencia: contextoBase.periodo_referencia || \"Semana_Actual\",\n  resumen_comunidad: contextoBase.resumen_comunidad || {},\n  activos_distribucion_generados: {\n    post_linkedin: postLinkedin,\n    destaque_newsletter_semanal: destaqueNewsletter,\n    sugerencia_contenido_faq: sugerenciaFAQ\n  },\n  almacenamiento_oci: {\n    bucket: \"communitylab-activos-marketing\",\n    ruta_objeto: rutaObjetoOCI,\n    status: \"pendiente\"\n  },\n  meta: {\n    procesado_en: fechaISO,\n    modo: \"solo_oci\",\n    workflow_execution_id: $execution.id || \"ejecucion_local\"\n  }\n};\n\nreturn [{ json: paqueteFinal }];"
+        "jsCode": "/**\n * ENSAMBLE PAQUETE DISTRIBUCIÓN — CommunityLab / LinkedIn Prompt V2\n * Acepta salida estructurada directa, wrapper {output: ...},\n * texto JSON en `text`, o arrays de wrappers como los mostrados en pruebas.\n */\nconst contextoBase = $('W4.2. Consolidar Análisis del Lote').first()?.json || {};\nconst itemsEntrada = $input.all();\n\nfunction parseJsonString(value) {\n  if (typeof value !== 'string') return value;\n  const trimmed = value.trim();\n  if (!trimmed) return value;\n  try { return JSON.parse(trimmed); } catch (_) { return value; }\n}\n\nfunction unwrap(value, depth = 0) {\n  if (depth > 6 || value == null) return value;\n  let current = parseJsonString(value);\n  if (Array.isArray(current)) {\n    if (current.length === 1) return unwrap(current[0], depth + 1);\n    return current.map(v => unwrap(v, depth + 1));\n  }\n  if (current && typeof current === 'object') {\n    if (current.output !== undefined) return unwrap(current.output, depth + 1);\n    if (current.result !== undefined && Object.keys(current).length <= 3) return unwrap(current.result, depth + 1);\n    if (current.response !== undefined && Object.keys(current).length <= 3) return unwrap(current.response, depth + 1);\n    if (current.text !== undefined && !current.titulo && !current.copy) {\n      const parsedText = parseJsonString(current.text);\n      if (parsedText !== current.text) return unwrap(parsedText, depth + 1);\n    }\n  }\n  return current;\n}\n\nfunction isLinkedInAsset(value) {\n  return value && typeof value === 'object' && (\n    'titulo' in value || 'copy' in value || 'tipo_experiencia' in value || 'omitido' in value\n  );\n}\n\nfunction normalizeLinkedIn(value) {\n  if (!isLinkedInAsset(value)) return null;\n  const asset = {\n    titulo: typeof value.titulo === 'string' ? value.titulo : '',\n    copy: typeof value.copy === 'string' ? value.copy : '',\n    canal_recomendado: value.canal_recomendado || 'LinkedIn Oficial',\n    potencial_engagement: ['Alto', 'Medio', 'Bajo'].includes(value.potencial_engagement) ? value.potencial_engagement : 'Bajo',\n    hashtags: Array.isArray(value.hashtags) ? value.hashtags : [],\n    origen_interacciones: Array.isArray(value.origen_interacciones) ? value.origen_interacciones : [],\n    tipo_experiencia: value.tipo_experiencia || null\n  };\n  if (value.omitido === true) {\n    asset.omitido = true;\n    asset.motivo = typeof value.motivo === 'string' ? value.motivo : 'No hay material utilizable para redactar un post fiel.';\n  }\n  return asset;\n}\n\nlet postLinkedin = { status: 'no_requerido' };\nlet sugerenciaFAQ = { status: 'no_requerido' };\n\nfor (const item of itemsEntrada) {\n  const datosOriginales = item?.json ?? {};\n  const datos = unwrap(datosOriginales);\n  const candidatos = Array.isArray(datos) ? datos : [datos];\n  for (const candidato of candidatos) {\n    const linkedin = normalizeLinkedIn(candidato);\n    if (linkedin) {\n      postLinkedin = linkedin.omitido\n        ? { ...linkedin, status: 'omitido' }\n        : linkedin;\n    } else if (candidato && typeof candidato === 'object' && (\n      'tema' in candidato || 'contenido_sugerido' in candidato || 'origen' in candidato\n    )) {\n      sugerenciaFAQ = candidato;\n    }\n  }\n}\n\nconst fechaISO = new Date().toISOString();\nconst timestamp = fechaISO.replace(/[:.-]/g, '');\nconst periodoRef = String(contextoBase.periodo_referencia || 'semana_actual').toLowerCase().replace(/\\s+/g, '_');\nconst rutaObjetoOCI = `activos/${periodoRef}/paquete-${timestamp}.json`;\nconst activos = {};\n// Se conserva el activo omitido en el paquete para dejar trazabilidad, pero se excluye de la curaduría/BD.\nif (postLinkedin.status !== 'no_requerido' || postLinkedin.omitido === true) activos.post_linkedin = postLinkedin;\nif (sugerenciaFAQ.status !== 'no_requerido') activos.sugerencia_contenido_faq = sugerenciaFAQ;\n\nconst paqueteFinal = {\n  status: 'exito',\n  id_lote: contextoBase.id_lote ?? null,\n  origen_comunidad: contextoBase.origen_comunidad || 'Comunidad_General',\n  periodo_referencia: contextoBase.periodo_referencia || 'Semana_Actual',\n  resumen_comunidad: contextoBase.resumen_comunidad || {},\n  activos_distribucion_generados: activos,\n  meta: {\n    procesado_en: fechaISO,\n    modo: 'solo_oci',\n    workflow_execution_id: $execution.id || 'ejecucion_local'\n  }\n};\nreturn [{ json: paqueteFinal }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3024,
+        3120,
         768
       ],
       "id": "8a48540b-7d34-4054-ad2b-e7d8ba093dbb",
@@ -232,13 +153,13 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH lote AS (\n    SELECT CAST(\n        '{{ $json.id_lote || $(\"Crear Lote de Procesamiento\").first().json.id_lote }}'\n        AS BIGINT\n    ) AS id_lote\n),\nactivos_entrada AS (\n    SELECT\n        l.id_lote,\n        a.tipo_activo,\n        a.contenido\n    FROM lote l\n    CROSS JOIN (\n        VALUES\n            (\n                'LINKEDIN',\n                '{{ JSON.stringify($json.activos_distribucion_generados.post_linkedin || null) }}'::JSONB\n            ),\n            (\n                'NEWSLETTER',\n                '{{ JSON.stringify($json.activos_distribucion_generados.destaque_newsletter_semanal || null) }}'::JSONB\n            ),\n            (\n                'FAQ',\n                '{{ JSON.stringify($json.activos_distribucion_generados.sugerencia_contenido_faq || null) }}'::JSONB\n            )\n    ) AS a(tipo_activo, contenido)\n    WHERE a.contenido IS NOT NULL\n      AND a.contenido <> 'null'::JSONB\n      AND a.contenido ->> 'status'\n          IS DISTINCT FROM 'no_requerido'\n)\nINSERT INTO activo_generado (\n    id_lote,\n    tipo_activo,\n    contenido,\n    estado_curaduria,\n    creado_en,\n    actualizado_en\n)\nSELECT\n    e.id_lote,\n    e.tipo_activo,\n    e.contenido,\n    'borrador',\n    NOW(),\n    NOW()\nFROM activos_entrada e\nON CONFLICT (id_lote, tipo_activo) DO NOTHING\nRETURNING\n    id_activo,\n    id_lote,\n    tipo_activo,\n    estado_curaduria,\n    id_version_actual;",
+        "query": "WITH lote AS (\n    SELECT CAST(\n        '{{ $json.id_lote || $(\"Crear Lote de Procesamiento\").first().json.id_lote }}'\n        AS BIGINT\n    ) AS id_lote\n),\nactivos_entrada AS (\n    SELECT\n        l.id_lote,\n        a.tipo_activo,\n        a.contenido\n    FROM lote l\n    CROSS JOIN (\n        VALUES\n            (\n                'LINKEDIN',\n                '{{ JSON.stringify($json.activos_distribucion_generados.post_linkedin || null) }}'::JSONB\n            ),\n            (\n                'FAQ',\n                '{{ JSON.stringify($json.activos_distribucion_generados.sugerencia_contenido_faq || null) }}'::JSONB\n            )\n    ) AS a(tipo_activo, contenido)\n    WHERE a.contenido IS NOT NULL\n      AND a.contenido <> 'null'::JSONB\n      AND a.contenido ->> 'status'\n          IS DISTINCT FROM 'no_requerido'\n)\nINSERT INTO activo_generado (\n    id_lote,\n    tipo_activo,\n    contenido,\n    estado_curaduria,\n    creado_en,\n    actualizado_en\n)\nSELECT\n    e.id_lote,\n    e.tipo_activo,\n    e.contenido,\n    'borrador',\n    NOW(),\n    NOW()\nFROM activos_entrada e\nON CONFLICT (id_lote, tipo_activo) DO NOTHING\nRETURNING\n    id_activo,\n    id_lote,\n    tipo_activo,\n    estado_curaduria,\n    id_version_actual;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3424,
+        3360,
         768
       ],
       "id": "c694bec3-8187-437f-90bb-3841cef986b6",
@@ -263,7 +184,7 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.4,
       "position": [
-        -336,
+        -368,
         704
       ],
       "id": "e6223c2c-d015-40f5-b7af-6ec5fd7ef247",
@@ -278,7 +199,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        96,
+        64,
         704
       ],
       "id": "4cb618d3-a75a-4276-8e4b-aef3b4587e45",
@@ -299,7 +220,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -112,
+        -144,
         704
       ],
       "id": "4134637d-089b-4e86-aee8-b4fc4663d100",
@@ -387,8 +308,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1008,
-        1904
+        1104,
+        1552
       ],
       "id": "19763219-154a-435a-af5b-17c559ae785b",
       "name": "Mock Generacion de Activos"
@@ -396,13 +317,13 @@
     {
       "parameters": {
         "options": {
-          "temperature": 0.7
+          "temperature": 0.5
         }
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        2336,
+        2192,
         912
       ],
       "id": "c81e4ec2-b29a-4382-9df3-8fa302a69753",
@@ -490,1366 +411,103 @@
           "name": "Postgres - CommunityLab Local"
         }
       }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"titulo\": { \"type\": \"string\" },\n    \"copy\": { \"type\": \"string\" },\n    \"canal_recomendado\": { \"type\": \"string\" },\n    \"potencial_engagement\": { \"type\": \"string\", \"enum\": [\"Alto\", \"Medio\", \"Bajo\"] },\n    \"hashtags\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"origen_interacciones\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n    \"tipo_experiencia\": {\n      \"type\": \"string\",\n      \"enum\": [\"logro_laboral\", \"experiencia_proyecto\", \"aprendizaje_tecnico\", \"testimonio_formacion\"]\n    },\n    \"omitido\": { \"type\": \"boolean\" },\n    \"motivo\": { \"type\": \"string\" }\n  },\n  \"required\": [\n    \"titulo\",\n    \"copy\",\n    \"canal_recomendado\",\n    \"potencial_engagement\",\n    \"hashtags\",\n    \"origen_interacciones\"\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2352,
+        960
+      ],
+      "id": "8f29b043-d3d3-4ba8-8e2a-f4a683612655",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "content": "# 🟨 FASE 1: PROGRAMACIÓN Y PREPARACIÓN DEL LOTE\n\n## Propósito\nIniciar una corrida de procesamiento sobre actividades que ya fueron registradas en PostgreSQL y todavía están pendientes de análisis. Esta versión del workflow no recibe el lote mediante un Webhook: comienza con `Schedule Trigger`.\n\n## Secuencia\n1. `Schedule Trigger` inicia la ejecución según la programación configurada.\n2. `Crear Lote de Procesamiento` registra el lote de trabajo.\n3. `Asignar Lote a Actividades Pendientes` vincula al lote las actividades pendientes que serán procesadas.\n\n## Datos de entrada\n- Actividades previamente almacenadas en la tabla `actividad`.\n- Metadatos de la fuente y configuración del lote, según las consultas SQL de los nodos.\n\n## Resultado / continuidad\nLas actividades seleccionadas quedan asociadas a un lote y se envían al análisis individual mediante `Analista de Contenido (LLM)`.\n\n## Persistencia relacionada\n- `lote_procesamiento`: registro y estado del lote.\n- `actividad`: actividades existentes y su asociación con el lote.\n\n**Fuera del alcance de esta fase:** recepción HTTP, validación de un JSON enviado por un cliente y respuesta HTTP 400. Esas operaciones no forman parte de la ruta activa representada en este archivo.",
+        "height": 1408,
+        "width": 640,
+        "color": "#271136"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -416,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "0de53802-4862-4117-b0c6-27e00c474b12",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# 🟦 FASE 2: ANÁLISIS SEMÁNTICO Y CONSOLIDACIÓN\n\n## Propósito\nAnalizar cada actividad asignada al lote, conservar el resultado estructurado en PostgreSQL y preparar una vista consolidada de las interacciones analizadas.\n\n## Secuencia\n1. `Analista de Contenido (LLM)` interpreta el contenido individual con Gemini y el Structured Output Parser.\n2. `Code: Preparar Análisis para W3` adapta el resultado al formato esperado por la persistencia.\n3. `W3. Guardar Análisis LLM` registra el análisis en la tabla `analisis`.\n4. `W4. Consolidar Lote en Postgres` actualiza el resumen/estado del lote a partir de los resultados disponibles.\n5. `W4.1. Obtener Actividades Analizadas del Lote` recupera las actividades y sus análisis.\n6. `W4.2. Consolidar Análisis del Lote` construye el objeto consolidado que consume el evaluador de activos.\n\n## Campos analíticos definidos por el prompt\n- `sentimiento`\n- `tema_categoria` y `tema_libre`\n- `score_relevancia` (entero de 1 a 10)\n- `tipo_insight`\n- `resumen`\n- `cita_extraida`\n- `razon_relevancia`\n\nEl resultado persistido también puede conservarse en `analisis.resultado_json` para auditoría, de acuerdo con el mapeo del nodo.\n\n## Resultado / continuidad\nUn lote con sus análisis individuales guardados y un objeto consolidado con metadatos, resumen y evidencias para decidir qué activos generar.\n\n## Modo de prueba\n`Mock Analista LLM` existe como apoyo de desarrollo, pero está desconectado de la ruta principal en las conexiones de este workflow. La ruta activa utiliza el analista LLM.",
+        "height": 1408,
+        "width": 1152,
+        "color": "#192D48"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        240,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "b0611e19-f1f8-4398-a038-f48f5c250f26",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# 🟩 FASE 3: EVALUACIÓN DE EVIDENCIAS Y GENERACIÓN DE CONTENIDO\n\n## Propósito\nClasificar las evidencias del lote y decidir qué tipos de activos se solicitan, ya sea por reglas automáticas o por `opciones.generar_activos`.\n\n## Evaluación de evidencias\n`Evaluador de Activos (Branching)` examina los análisis consolidados y separa:\n- `evidencias.testimonios_logros`: insights de tipo testimonio/logro con sentimiento positivo.\n- `evidencias.preguntas_dudas`: insights que corresponden a preguntas o dudas técnicas.\n\nSi no se especifica una lista válida en `opciones.generar_activos`, las reglas automáticas proponen:\n- LinkedIn y Newsletter cuando existen testimonios/logros positivos.\n- FAQ cuando existen preguntas/dudas.\n\nSi se informa `opciones.generar_activos`, el evaluador filtra los valores admitidos (`LINKEDIN`, `NEWSLETTER`, `FAQ`) y utiliza ese conjunto como selección explícita.\n\n## Ruta conectada en esta versión\n- `Generador de Post para LinkedIn`: redacta una publicación a partir de las evidencias disponibles, con reglas de fidelidad al mensaje original.\n- `Sin activos - continuar`: emite un marcador cuando ninguna bandera de generación está activa para que el flujo pueda continuar sin contenido generado.\n\n## Importante: alcance implementado\nAunque el evaluador calcula banderas para LinkedIn, Newsletter y FAQ, en las conexiones de este archivo solo aparece conectado el generador de LinkedIn. No se observan generadores conectados para Newsletter ni FAQ en esta versión. La documentación no debe dar por implementadas esas dos rutas hasta que se incorporen y conecten sus nodos.\n\n## Resultado / continuidad\nEl contenido generado (o el marcador de ausencia de activos) pasa a `Ensamble Paquete Distribución`.",
+        "height": 1408,
+        "width": 1536,
+        "color": "#172B1B"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "d614bcb3-0cb3-47f8-b2e8-b1d6e7879660",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "# 🟪 FASE 4: ENSAMBLE Y PERSISTENCIA DE ACTIVOS EN POSTGRESQL\n\n## Propósito\nTomar el resultado de generación —o la ruta sin activos—, normalizarlo y persistir el activo generado y su primera versión en PostgreSQL.\n\n## Secuencia activa\n1. `Ensamble Paquete Distribución` organiza el resultado del lote y el contenido de LinkedIn cuando existe.\n2. `W5. Guardar Activos Generados` registra el activo lógico en `activo_generado`.\n3. `W5.2 — Crear la versión inicial` inserta el contenido inicial en `version_activo`.\n4. `W5.3 — Vincular la versión actual` vincula la versión creada al activo como versión vigente.\n5. `W5.4 — Verificar la persistencia` comprueba el resultado de las operaciones de persistencia.\n\n## Modelo de datos relacionado\n- `activo_generado`: tipo, contenido y estado de curaduría.\n- `version_activo`: historial de versiones, con `origen_version = 'ia'` para la versión inicial.\n- `lote_procesamiento`: lote al que pertenece el activo.\n\nLos nombres de tipos y campos concretos deben seguir los valores que utilizan las consultas SQL y el objeto construido por el workflow.\n\n## Límite de esta versión\nEste archivo no muestra nodos conectados para subir el paquete a OCI Object Storage ni para responder a un Webhook HTTP. La tabla `almacenamiento_oci` existe en el esquema SQL, pero eso por sí solo no demuestra que este workflow la escriba. Documentar la integración OCI como parte de esta ruta requiere incorporar o verificar los nodos correspondientes.\n\n## Resultado / continuidad\nActivos y versión inicial registrados en PostgreSQL, con verificación posterior de persistencia.",
+        "height": 1392,
+        "width": 1376,
+        "color": "#2D0B32"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2960,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "d34dfdf8-2730-4c3f-9ee5-923a22cefd47",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "# 🟧 NODOS MOCK PARA DESARROLLO Y PRUEBAS\n\n## Propósito\nMantener alternativas de prueba para ensayar partes del procesamiento sin depender siempre de la respuesta real del modelo de lenguaje.\n\n## Mocks identificados\n- `Mock Analista LLM`: produce resultados analíticos simulados.\n- `Mock Generacion de Activos`: simula decisiones/resultados para probar escenarios de selección de activos.\n\n## Estado de conexión\nEn el JSON revisado, ambos nodos mock aparecen sin conexiones de salida en la ruta principal. Por tanto, no sustituyen automáticamente a los nodos reales ni están integrados en la ejecución activa. Para usarlos, hay que conectarlos explícitamente o activar una ruta de prueba separada y controlada.\n\n## No asumir\nLa versión actual de este workflow no contiene un nodo `Mock Subida OCI` ni una ruta conectada de subida OCI. Tampoco se observa aquí la secuencia de respuesta HTTP descrita en documentación anterior.\n\n## Recomendación de uso\nAntes de una prueba, verificar qué ruta está conectada y qué nodos están habilitados. Los mocks deben devolver la misma estructura que esperan los nodos siguientes para que la prueba sea representativa.",
+        "height": 452,
+        "width": 1920,
+        "color": "#A93D3D"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        1456
+      ],
+      "id": "eadf5bbe-ff2d-4187-84e0-f30f29601b16",
+      "name": "Sticky Note - Mocks y Merge"
     }
   ],
-  "pinData": {
-    "Crear Lote de Procesamiento": [
-      {
-        "json": {
-          "id_lote": "1",
-          "id_fuente": "1",
-          "periodo_referencia": "2026-10-13 23:10 - 2026-10-13 23:11",
-          "estado": "procesando",
-          "ventana_desde": "2026-10-13T23:10:56.901Z",
-          "ventana_hasta": "2026-10-13T23:11:11.306Z",
-          "creado_en": "2026-10-13T23:11:11.306Z"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ],
-    "Asignar Lote a Actividades Pendientes": [
-      {
-        "json": {
-          "id_actividad": "1",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "1",
-          "id_autor": "1",
-          "contenido": "Hola a todos! Acabo de unirme al servidor. Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido ????",
-          "tipo_declarado": "saludo",
-          "identificador_origen": "2002002002002002001",
-          "momento_origen": "2026-10-11T23:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "2",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "1",
-          "id_autor": "2",
-          "contenido": "Alguien m??s not?? que el agente con memory se pone lento despu??s de 10 turnos? Estoy midiendo latencia en mi setup local.",
-          "tipo_declarado": "pregunta",
-          "identificador_origen": "2002002002002002002",
-          "momento_origen": "2026-10-12T05:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "3",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "2",
-          "id_autor": "3",
-          "contenido": "??Logr?? mi primera entrevista t??cnica gracias al m??dulo de agentes! Me preguntaron por LangGraph y pude explicar el grafo de estados sin problema. Gracias comunidad ????",
-          "tipo_declarado": "testimonio",
-          "identificador_origen": "2002002002002002003",
-          "momento_origen": "2026-10-12T11:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "4",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "2",
-          "id_autor": "4",
-          "contenido": "Comparto oferta: startup de AI en remoto busca mid-level con experiencia en Python + orquestaci??n de agentes. Si alguien est?? buscando, DM.",
-          "tipo_declarado": "oportunidad",
-          "identificador_origen": "2002002002002002004",
-          "momento_origen": "2026-10-13T03:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "5",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "3",
-          "id_autor": "5",
-          "contenido": "No entiendo bien cu??ndo usar StateGraph vs MessageGraph. En el curso se menciona pero no veo un ejemplo claro de cu??ndo conviene uno u otro. ??Alguien tiene un caso real?",
-          "tipo_declarado": "duda",
-          "identificador_origen": "2002002002002002005",
-          "momento_origen": "2026-10-13T05:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "6",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "3",
-          "id_autor": "2",
-          "contenido": "Estoy intentando pasar tool results al siguiente nodo y se me pierde el contexto. ??Hay que usar un reducer expl??cito en el state o alcanza con el default?",
-          "tipo_declarado": "pregunta_tecnica",
-          "identificador_origen": "2002002002002002006",
-          "momento_origen": "2026-10-13T08:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "7",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "3",
-          "id_autor": "6",
-          "contenido": "Tip r??pido: si us??s checkpointing con Postgres, fijate de versionar el schema del state. Me pas?? que un cambio de campo rompi?? todos los threads viejos.",
-          "tipo_declarado": "tip",
-          "identificador_origen": "2002002002002002007",
-          "momento_origen": "2026-10-13T11:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "8",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "4",
-          "id_autor": "1",
-          "contenido": "??Alguien despleg?? un agente en OCI Functions o siempre usan Compute? Estoy evaluando costos y cold start me preocupa para un chatbot de soporte.",
-          "tipo_declarado": "pregunta_tecnica",
-          "identificador_origen": "2002002002002002008",
-          "momento_origen": "2026-10-13T13:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "9",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "4",
-          "id_autor": "4",
-          "contenido": "Error raro con el SDK de OCI en Python 3.12: al subir un objeto grande a Object Storage me tira timeout aunque el connection pool est?? ok. ??Conocen alg??n workaround?",
-          "tipo_declarado": "error",
-          "identificador_origen": "2002002002002002009",
-          "momento_origen": "2026-10-13T15:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "10",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "5",
-          "id_autor": "3",
-          "contenido": "El m??dulo de prompt engineering est?? excelente. Lo ??nico: me gustar??a m??s ejemplos de few-shot con outputs estructurados (JSON schema). El resto 10/10.",
-          "tipo_declarado": "feedback",
-          "identificador_origen": "2002002002002002010",
-          "momento_origen": "2026-10-13T17:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "11",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "5",
-          "id_autor": "5",
-          "contenido": "La parte de evaluaci??n de agentes se siente un poco corta. Ser??a genial un lab donde midamos faithfulness y tool accuracy con un dataset chico.",
-          "tipo_declarado": "sugerencia",
-          "identificador_origen": "2002002002002002011",
-          "momento_origen": "2026-10-13T19:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "12",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "5",
-          "id_autor": "6",
-          "contenido": "Termin?? el track de LangGraph. Antes no entend??a graphs; ahora arm?? un flujo de onboarding con human-in-the-loop y funciona. Gran curso.",
-          "tipo_declarado": "testimonio",
-          "identificador_origen": "2002002002002002012",
-          "momento_origen": "2026-10-13T21:10:56.901Z",
-          "estado_procesamiento": "en_lote"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ],
-    "Analista de Contenido (LLM)": [
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Positivo",
-            "tema_categoria": "Otro",
-            "tema_libre": "Inicio de aprendizaje en OCI y LangGraph",
-            "score_relevancia": 3,
-            "tipo_insight": "ninguno",
-            "resumen": "El usuario saluda a la comunidad al unirse al servidor y solicita consejos para comenzar su aprendizaje en OCI y LangGraph.",
-            "cita_extraida": "Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido",
-            "razon_relevancia": "Es un mensaje de bienvenida que identifica tecnologías de interés para el usuario, pero no ofrece un caso de éxito, feedback profundo o una duda técnica específica para generar contenido."
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Latencia en agentes con memoria",
-            "score_relevancia": 8,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El usuario consulta si otros han experimentado un aumento en la latencia de un agente con memoria tras 10 turnos de interacción, basándose en pruebas realizadas en su entorno local.",
-            "cita_extraida": "el agente con memory se pone lento despu??s de 10 turnos",
-            "razon_relevancia": "Plantea un problema técnico específico y avanzado sobre el rendimiento de agentes de IA, lo cual es un excelente punto de partida para crear contenido sobre optimización y gestión de memoria."
-          }
-        },
-        "pairedItem": {
-          "item": 1
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Muy Positivo",
-            "tema_categoria": "Logro Laboral",
-            "tema_libre": "Primera entrevista técnica y aplicación de LangGraph",
-            "score_relevancia": 9,
-            "tipo_insight": "testimonio",
-            "resumen": "El estudiante comparte que obtuvo su primera entrevista técnica gracias al módulo de agentes, destacando que pudo explicar conceptos de LangGraph y grafos de estados.",
-            "cita_extraida": "Logré mi primera entrevista técnica gracias al módulo de agentes",
-            "razon_relevancia": "Es un testimonio de éxito concreto que vincula un módulo específico del curso con una oportunidad laboral real y el dominio de una tecnología avanzada, lo cual es altamente valioso para marketing."
-          }
-        },
-        "pairedItem": {
-          "item": 2
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Positivo",
-            "tema_categoria": "Otro",
-            "tema_libre": "Compartir oferta laboral en IA",
-            "score_relevancia": 6,
-            "tipo_insight": "ninguno",
-            "resumen": "El usuario comparte una oferta laboral remota para una startup de IA que busca perfiles mid-level con conocimientos en Python y orquestación de agentes.",
-            "cita_extraida": "startup de AI en remoto busca mid-level con experiencia en Python + orquestación de agentes",
-            "razon_relevancia": "Aunque no es un testimonio directo del curso, el mensaje es relevante para el área de contenido ya que identifica habilidades específicas (Python, orquestación de agentes) demandadas actualmente por el mercado laboral de IA."
-          }
-        },
-        "pairedItem": {
-          "item": 3
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Diferencia entre StateGraph y MessageGraph",
-            "score_relevancia": 8,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante solicita ejemplos prácticos y casos de uso reales para distinguir entre StateGraph y MessageGraph, indicando que la explicación actual del curso no es suficiente.",
-            "cita_extraida": "No entiendo bien cuándo usar StateGraph vs MessageGraph. En el curso se menciona pero no veo un ejemplo claro",
-            "razon_relevancia": "Identifica una brecha de contenido específica y una oportunidad para crear material educativo complementario (como un tutorial o post) basado en una duda conceptual clara."
-          }
-        },
-        "pairedItem": {
-          "item": 4
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Manejo de estado y reducers en flujos de agentes",
-            "score_relevancia": 7,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante consulta sobre la pérdida de contexto al pasar resultados de herramientas entre nodos y pregunta si es necesario configurar un reducer explícito en el estado.",
-            "cita_extraida": "??Hay que usar un reducer expl??cito en el state o alcanza con el default?",
-            "razon_relevancia": "Plantea una duda técnica específica sobre el manejo de estados en arquitecturas de agentes, lo cual es un tema de nivel intermedio/avanzado ideal para generar contenido educativo tipo FAQ o tutorial."
-          }
-        },
-        "pairedItem": {
-          "item": 5
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Positivo",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Versionado de schema en checkpointing con Postgres",
-            "score_relevancia": 8,
-            "tipo_insight": "ninguno",
-            "resumen": "El autor comparte un consejo técnico sobre la importancia de versionar el esquema del estado al usar checkpointing con Postgres para evitar errores de compatibilidad al modificar campos.",
-            "cita_extraida": "si usás checkpointing con Postgres, fijate de versionar el schema del state",
-            "razon_relevancia": "Proporciona un consejo técnico muy específico y accionable basado en una experiencia real de error, lo cual es ideal para crear contenido educativo sobre buenas prácticas."
-          }
-        },
-        "pairedItem": {
-          "item": 6
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Despliegue en OCI Functions vs Compute",
-            "score_relevancia": 7,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El usuario consulta sobre la viabilidad de desplegar un agente en OCI Functions frente a instancias Compute, manifestando preocupación por los costos y el impacto del cold start en un chatbot de soporte.",
-            "cita_extraida": "cold start me preocupa para un chatbot de soporte",
-            "razon_relevancia": "Plantea un dilema técnico específico sobre arquitectura de nube y optimización de recursos, lo cual es un excelente punto de partida para crear contenido comparativo sobre despliegue de IA."
-          }
-        },
-        "pairedItem": {
-          "item": 7
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "score_relevancia": 7,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante reporta un error de timeout al subir archivos grandes a OCI Object Storage usando Python 3.12, a pesar de tener configurado correctamente el pool de conexiones, y solicita una solución alternativa.",
-            "cita_extraida": "Error raro con el SDK de OCI en Python 3.12: al subir un objeto grande a Object Storage me tira timeout",
-            "razon_relevancia": "Es una duda técnica muy específica que involucra versiones recientes de software y servicios de nube, lo cual es valioso para crear guías de resolución de problemas o contenido técnico avanzado."
-          }
-        },
-        "pairedItem": {
-          "item": 8
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Muy Positivo",
-            "tema_categoria": "Feedback de Curso",
-            "tema_libre": "Prompt engineering con outputs estructurados",
-            "score_relevancia": 8,
-            "tipo_insight": "feedback",
-            "resumen": "El estudiante califica el módulo de prompt engineering como excelente y sugiere incluir más ejemplos de few-shot con esquemas JSON.",
-            "cita_extraida": "El m??dulo de prompt engineering est?? excelente. Lo ??nico: me gustar??a m??s ejemplos de few-shot con outputs estructurados (JSON schema).",
-            "razon_relevancia": "Ofrece una valoración muy alta del curso junto con una sugerencia técnica específica y valiosa para mejorar el contenido educativo."
-          }
-        },
-        "pairedItem": {
-          "item": 9
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Feedback de Curso",
-            "tema_libre": "Evaluación de agentes y métricas de fidelidad",
-            "score_relevancia": 9,
-            "tipo_insight": "feedback",
-            "resumen": "El estudiante sugiere profundizar en la sección de evaluación de agentes mediante un laboratorio práctico que mida la fidelidad y la precisión de las herramientas con un conjunto de datos pequeño.",
-            "cita_extraida": "La parte de evaluaci??n de agentes se siente un poco corta. Ser??a genial un lab donde midamos faithfulness y tool accuracy",
-            "razon_relevancia": "Proporciona una sugerencia técnica muy específica y de alto valor educativo, mencionando conceptos avanzados de IA que pueden convertirse en un nuevo módulo o recurso práctico."
-          }
-        },
-        "pairedItem": {
-          "item": 10
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Muy Positivo",
-            "tema_categoria": "Testimonio de Proyecto",
-            "tema_libre": "Implementación de flujos con LangGraph",
-            "score_relevancia": 9,
-            "tipo_insight": "testimonio",
-            "resumen": "El estudiante completó el track de LangGraph y logró desarrollar un flujo de onboarding con human-in-the-loop, destacando su progreso en la comprensión de grafos.",
-            "cita_extraida": "Antes no entendía graphs; ahora armé un flujo de onboarding con human-in-the-loop y funciona",
-            "razon_relevancia": "El mensaje describe un resultado tangible y técnico tras completar el curso, mostrando una transformación clara en el conocimiento del usuario, lo que lo hace ideal para casos de éxito."
-          }
-        },
-        "pairedItem": {
-          "item": 11
-        }
-      }
-    ],
-    "W3. Guardar Análisis LLM": [
-      {
-        "json": {
-          "id_analisis": "1",
-          "id_actividad": "1",
-          "sentimiento": "Positivo",
-          "relevancia": "Baja",
-          "tipo_insight": "ninguno",
-          "creado_en": "2026-10-13T23:11:46.323Z",
-          "actualizado_en": "2026-10-13T23:11:46.323Z"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "2",
-          "id_actividad": "2",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "creado_en": "2026-10-13T23:11:46.373Z",
-          "actualizado_en": "2026-10-13T23:11:46.373Z"
-        },
-        "pairedItem": {
-          "item": 1
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "3",
-          "id_actividad": "3",
-          "sentimiento": "Muy Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "testimonio",
-          "creado_en": "2026-10-13T23:11:46.394Z",
-          "actualizado_en": "2026-10-13T23:11:46.394Z"
-        },
-        "pairedItem": {
-          "item": 2
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "4",
-          "id_actividad": "4",
-          "sentimiento": "Positivo",
-          "relevancia": "Media",
-          "tipo_insight": "ninguno",
-          "creado_en": "2026-10-13T23:11:46.413Z",
-          "actualizado_en": "2026-10-13T23:11:46.413Z"
-        },
-        "pairedItem": {
-          "item": 3
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "5",
-          "id_actividad": "5",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "creado_en": "2026-10-13T23:11:46.432Z",
-          "actualizado_en": "2026-10-13T23:11:46.432Z"
-        },
-        "pairedItem": {
-          "item": 4
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "6",
-          "id_actividad": "6",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "creado_en": "2026-10-13T23:11:46.448Z",
-          "actualizado_en": "2026-10-13T23:11:46.448Z"
-        },
-        "pairedItem": {
-          "item": 5
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "7",
-          "id_actividad": "7",
-          "sentimiento": "Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "ninguno",
-          "creado_en": "2026-10-13T23:11:46.469Z",
-          "actualizado_en": "2026-10-13T23:11:46.469Z"
-        },
-        "pairedItem": {
-          "item": 6
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "8",
-          "id_actividad": "8",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "creado_en": "2026-10-13T23:11:46.485Z",
-          "actualizado_en": "2026-10-13T23:11:46.485Z"
-        },
-        "pairedItem": {
-          "item": 7
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "9",
-          "id_actividad": "9",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "creado_en": "2026-10-13T23:11:46.503Z",
-          "actualizado_en": "2026-10-13T23:11:46.503Z"
-        },
-        "pairedItem": {
-          "item": 8
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "10",
-          "id_actividad": "10",
-          "sentimiento": "Muy Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "feedback",
-          "creado_en": "2026-10-13T23:11:46.520Z",
-          "actualizado_en": "2026-10-13T23:11:46.520Z"
-        },
-        "pairedItem": {
-          "item": 9
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "11",
-          "id_actividad": "11",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "feedback",
-          "creado_en": "2026-10-13T23:11:46.540Z",
-          "actualizado_en": "2026-10-13T23:11:46.540Z"
-        },
-        "pairedItem": {
-          "item": 10
-        }
-      },
-      {
-        "json": {
-          "id_analisis": "12",
-          "id_actividad": "12",
-          "sentimiento": "Muy Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "testimonio",
-          "creado_en": "2026-10-13T23:11:46.561Z",
-          "actualizado_en": "2026-10-13T23:11:46.561Z"
-        },
-        "pairedItem": {
-          "item": 11
-        }
-      }
-    ],
-    "W4. Consolidar Lote en Postgres": [
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "12"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 1
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 2
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 3
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 4
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 5
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 6
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 7
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 8
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 9
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 10
-        }
-      },
-      {
-        "json": {
-          "id_lote": "1",
-          "estado": "procesando",
-          "sentimiento_predominante": "Neutral",
-          "temas_principales": [
-            "Compartir oferta laboral en IA",
-            "Despliegue en OCI Functions vs Compute",
-            "Diferencia entre StateGraph y MessageGraph",
-            "Evaluación de agentes y métricas de fidelidad",
-            "Implementación de flujos con LangGraph",
-            "Inicio de aprendizaje en OCI y LangGraph",
-            "Latencia en agentes con memoria",
-            "Manejo de estado y reducers en flujos de agentes",
-            "Primera entrevista técnica y aplicación de LangGraph",
-            "Prompt engineering con outputs estructurados",
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "total_interacciones": 12,
-          "total_actividades_analizadas": "0"
-        },
-        "pairedItem": {
-          "item": 11
-        }
-      }
-    ],
-    "W4.1. Obtener Actividades Analizadas del Lote": [
-      {
-        "json": {
-          "id_actividad": "1",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "1",
-          "id_autor": "1",
-          "contenido": "Hola a todos! Acabo de unirme al servidor. Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido ????",
-          "tipo_declarado": "saludo",
-          "identificador_origen": "2002002002002002001",
-          "momento_origen": "2026-10-11T23:10:56.901Z",
-          "autor": "Ana Mart??nez",
-          "canal": "general",
-          "sentimiento": "Positivo",
-          "relevancia": "Baja",
-          "tipo_insight": "ninguno",
-          "temas": [
-            "Inicio de aprendizaje en OCI y LangGraph"
-          ],
-          "resumen": "El usuario saluda a la comunidad al unirse al servidor y solicita consejos para comenzar su aprendizaje en OCI y LangGraph.",
-          "evidencia_clave": "Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido",
-          "resultado_json": {
-            "resumen": "El usuario saluda a la comunidad al unirse al servidor y solicita consejos para comenzar su aprendizaje en OCI y LangGraph.",
-            "tema_libre": "Inicio de aprendizaje en OCI y LangGraph",
-            "sentimiento": "Positivo",
-            "tipo_insight": "ninguno",
-            "cita_extraida": "Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido",
-            "tema_categoria": "Otro",
-            "razon_relevancia": "Es un mensaje de bienvenida que identifica tecnologías de interés para el usuario, pero no ofrece un caso de éxito, feedback profundo o una duda técnica específica para generar contenido.",
-            "score_relevancia": 3
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "2",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "1",
-          "id_autor": "2",
-          "contenido": "Alguien m??s not?? que el agente con memory se pone lento despu??s de 10 turnos? Estoy midiendo latencia en mi setup local.",
-          "tipo_declarado": "pregunta",
-          "identificador_origen": "2002002002002002002",
-          "momento_origen": "2026-10-12T05:10:56.901Z",
-          "autor": "Carlos Ruiz",
-          "canal": "general",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "temas": [
-            "Latencia en agentes con memoria"
-          ],
-          "resumen": "El usuario consulta si otros han experimentado un aumento en la latencia de un agente con memoria tras 10 turnos de interacción, basándose en pruebas realizadas en su entorno local.",
-          "evidencia_clave": "el agente con memory se pone lento despu??s de 10 turnos",
-          "resultado_json": {
-            "resumen": "El usuario consulta si otros han experimentado un aumento en la latencia de un agente con memoria tras 10 turnos de interacción, basándose en pruebas realizadas en su entorno local.",
-            "tema_libre": "Latencia en agentes con memoria",
-            "sentimiento": "Neutral",
-            "tipo_insight": "duda_recurrente",
-            "cita_extraida": "el agente con memory se pone lento despu??s de 10 turnos",
-            "tema_categoria": "Duda Técnica",
-            "razon_relevancia": "Plantea un problema técnico específico y avanzado sobre el rendimiento de agentes de IA, lo cual es un excelente punto de partida para crear contenido sobre optimización y gestión de memoria.",
-            "score_relevancia": 8
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "3",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "2",
-          "id_autor": "3",
-          "contenido": "??Logr?? mi primera entrevista t??cnica gracias al m??dulo de agentes! Me preguntaron por LangGraph y pude explicar el grafo de estados sin problema. Gracias comunidad ????",
-          "tipo_declarado": "testimonio",
-          "identificador_origen": "2002002002002002003",
-          "momento_origen": "2026-10-12T11:10:56.901Z",
-          "autor": "Laura G??mez",
-          "canal": "logros-y-empleos",
-          "sentimiento": "Muy Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "testimonio",
-          "temas": [
-            "Primera entrevista técnica y aplicación de LangGraph"
-          ],
-          "resumen": "El estudiante comparte que obtuvo su primera entrevista técnica gracias al módulo de agentes, destacando que pudo explicar conceptos de LangGraph y grafos de estados.",
-          "evidencia_clave": "Logré mi primera entrevista técnica gracias al módulo de agentes",
-          "resultado_json": {
-            "resumen": "El estudiante comparte que obtuvo su primera entrevista técnica gracias al módulo de agentes, destacando que pudo explicar conceptos de LangGraph y grafos de estados.",
-            "tema_libre": "Primera entrevista técnica y aplicación de LangGraph",
-            "sentimiento": "Muy Positivo",
-            "tipo_insight": "testimonio",
-            "cita_extraida": "Logré mi primera entrevista técnica gracias al módulo de agentes",
-            "tema_categoria": "Logro Laboral",
-            "razon_relevancia": "Es un testimonio de éxito concreto que vincula un módulo específico del curso con una oportunidad laboral real y el dominio de una tecnología avanzada, lo cual es altamente valioso para marketing.",
-            "score_relevancia": 9
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "4",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "2",
-          "id_autor": "4",
-          "contenido": "Comparto oferta: startup de AI en remoto busca mid-level con experiencia en Python + orquestaci??n de agentes. Si alguien est?? buscando, DM.",
-          "tipo_declarado": "oportunidad",
-          "identificador_origen": "2002002002002002004",
-          "momento_origen": "2026-10-13T03:10:56.901Z",
-          "autor": "Diego Fern??ndez",
-          "canal": "logros-y-empleos",
-          "sentimiento": "Positivo",
-          "relevancia": "Media",
-          "tipo_insight": "ninguno",
-          "temas": [
-            "Compartir oferta laboral en IA"
-          ],
-          "resumen": "El usuario comparte una oferta laboral remota para una startup de IA que busca perfiles mid-level con conocimientos en Python y orquestación de agentes.",
-          "evidencia_clave": "startup de AI en remoto busca mid-level con experiencia en Python + orquestación de agentes",
-          "resultado_json": {
-            "resumen": "El usuario comparte una oferta laboral remota para una startup de IA que busca perfiles mid-level con conocimientos en Python y orquestación de agentes.",
-            "tema_libre": "Compartir oferta laboral en IA",
-            "sentimiento": "Positivo",
-            "tipo_insight": "ninguno",
-            "cita_extraida": "startup de AI en remoto busca mid-level con experiencia en Python + orquestación de agentes",
-            "tema_categoria": "Otro",
-            "razon_relevancia": "Aunque no es un testimonio directo del curso, el mensaje es relevante para el área de contenido ya que identifica habilidades específicas (Python, orquestación de agentes) demandadas actualmente por el mercado laboral de IA.",
-            "score_relevancia": 6
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "5",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "3",
-          "id_autor": "5",
-          "contenido": "No entiendo bien cu??ndo usar StateGraph vs MessageGraph. En el curso se menciona pero no veo un ejemplo claro de cu??ndo conviene uno u otro. ??Alguien tiene un caso real?",
-          "tipo_declarado": "duda",
-          "identificador_origen": "2002002002002002005",
-          "momento_origen": "2026-10-13T05:10:56.901Z",
-          "autor": "Sof??a P??rez",
-          "canal": "dudas-langgraph",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "temas": [
-            "Diferencia entre StateGraph y MessageGraph"
-          ],
-          "resumen": "El estudiante solicita ejemplos prácticos y casos de uso reales para distinguir entre StateGraph y MessageGraph, indicando que la explicación actual del curso no es suficiente.",
-          "evidencia_clave": "No entiendo bien cuándo usar StateGraph vs MessageGraph. En el curso se menciona pero no veo un ejemplo claro",
-          "resultado_json": {
-            "resumen": "El estudiante solicita ejemplos prácticos y casos de uso reales para distinguir entre StateGraph y MessageGraph, indicando que la explicación actual del curso no es suficiente.",
-            "tema_libre": "Diferencia entre StateGraph y MessageGraph",
-            "sentimiento": "Neutral",
-            "tipo_insight": "duda_recurrente",
-            "cita_extraida": "No entiendo bien cuándo usar StateGraph vs MessageGraph. En el curso se menciona pero no veo un ejemplo claro",
-            "tema_categoria": "Duda Técnica",
-            "razon_relevancia": "Identifica una brecha de contenido específica y una oportunidad para crear material educativo complementario (como un tutorial o post) basado en una duda conceptual clara.",
-            "score_relevancia": 8
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "6",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "3",
-          "id_autor": "2",
-          "contenido": "Estoy intentando pasar tool results al siguiente nodo y se me pierde el contexto. ??Hay que usar un reducer expl??cito en el state o alcanza con el default?",
-          "tipo_declarado": "pregunta_tecnica",
-          "identificador_origen": "2002002002002002006",
-          "momento_origen": "2026-10-13T08:10:56.901Z",
-          "autor": "Carlos Ruiz",
-          "canal": "dudas-langgraph",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "temas": [
-            "Manejo de estado y reducers en flujos de agentes"
-          ],
-          "resumen": "El estudiante consulta sobre la pérdida de contexto al pasar resultados de herramientas entre nodos y pregunta si es necesario configurar un reducer explícito en el estado.",
-          "evidencia_clave": "??Hay que usar un reducer expl??cito en el state o alcanza con el default?",
-          "resultado_json": {
-            "resumen": "El estudiante consulta sobre la pérdida de contexto al pasar resultados de herramientas entre nodos y pregunta si es necesario configurar un reducer explícito en el estado.",
-            "tema_libre": "Manejo de estado y reducers en flujos de agentes",
-            "sentimiento": "Neutral",
-            "tipo_insight": "duda_recurrente",
-            "cita_extraida": "??Hay que usar un reducer expl??cito en el state o alcanza con el default?",
-            "tema_categoria": "Duda Técnica",
-            "razon_relevancia": "Plantea una duda técnica específica sobre el manejo de estados en arquitecturas de agentes, lo cual es un tema de nivel intermedio/avanzado ideal para generar contenido educativo tipo FAQ o tutorial.",
-            "score_relevancia": 7
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "7",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "3",
-          "id_autor": "6",
-          "contenido": "Tip r??pido: si us??s checkpointing con Postgres, fijate de versionar el schema del state. Me pas?? que un cambio de campo rompi?? todos los threads viejos.",
-          "tipo_declarado": "tip",
-          "identificador_origen": "2002002002002002007",
-          "momento_origen": "2026-10-13T11:10:56.901Z",
-          "autor": "Mart??n L??pez",
-          "canal": "dudas-langgraph",
-          "sentimiento": "Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "ninguno",
-          "temas": [
-            "Versionado de schema en checkpointing con Postgres"
-          ],
-          "resumen": "El autor comparte un consejo técnico sobre la importancia de versionar el esquema del estado al usar checkpointing con Postgres para evitar errores de compatibilidad al modificar campos.",
-          "evidencia_clave": "si usás checkpointing con Postgres, fijate de versionar el schema del state",
-          "resultado_json": {
-            "resumen": "El autor comparte un consejo técnico sobre la importancia de versionar el esquema del estado al usar checkpointing con Postgres para evitar errores de compatibilidad al modificar campos.",
-            "tema_libre": "Versionado de schema en checkpointing con Postgres",
-            "sentimiento": "Positivo",
-            "tipo_insight": "ninguno",
-            "cita_extraida": "si usás checkpointing con Postgres, fijate de versionar el schema del state",
-            "tema_categoria": "Duda Técnica",
-            "razon_relevancia": "Proporciona un consejo técnico muy específico y accionable basado en una experiencia real de error, lo cual es ideal para crear contenido educativo sobre buenas prácticas.",
-            "score_relevancia": 8
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "8",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "4",
-          "id_autor": "1",
-          "contenido": "??Alguien despleg?? un agente en OCI Functions o siempre usan Compute? Estoy evaluando costos y cold start me preocupa para un chatbot de soporte.",
-          "tipo_declarado": "pregunta_tecnica",
-          "identificador_origen": "2002002002002002008",
-          "momento_origen": "2026-10-13T13:10:56.901Z",
-          "autor": "Ana Mart??nez",
-          "canal": "dudas-tecnicas",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "temas": [
-            "Despliegue en OCI Functions vs Compute"
-          ],
-          "resumen": "El usuario consulta sobre la viabilidad de desplegar un agente en OCI Functions frente a instancias Compute, manifestando preocupación por los costos y el impacto del cold start en un chatbot de soporte.",
-          "evidencia_clave": "cold start me preocupa para un chatbot de soporte",
-          "resultado_json": {
-            "resumen": "El usuario consulta sobre la viabilidad de desplegar un agente en OCI Functions frente a instancias Compute, manifestando preocupación por los costos y el impacto del cold start en un chatbot de soporte.",
-            "tema_libre": "Despliegue en OCI Functions vs Compute",
-            "sentimiento": "Neutral",
-            "tipo_insight": "duda_recurrente",
-            "cita_extraida": "cold start me preocupa para un chatbot de soporte",
-            "tema_categoria": "Duda Técnica",
-            "razon_relevancia": "Plantea un dilema técnico específico sobre arquitectura de nube y optimización de recursos, lo cual es un excelente punto de partida para crear contenido comparativo sobre despliegue de IA.",
-            "score_relevancia": 7
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "9",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "4",
-          "id_autor": "4",
-          "contenido": "Error raro con el SDK de OCI en Python 3.12: al subir un objeto grande a Object Storage me tira timeout aunque el connection pool est?? ok. ??Conocen alg??n workaround?",
-          "tipo_declarado": "error",
-          "identificador_origen": "2002002002002002009",
-          "momento_origen": "2026-10-13T15:10:56.901Z",
-          "autor": "Diego Fern??ndez",
-          "canal": "dudas-tecnicas",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "duda_recurrente",
-          "temas": [
-            "Timeout en SDK de OCI con Python 3.12 y Object Storage"
-          ],
-          "resumen": "El estudiante reporta un error de timeout al subir archivos grandes a OCI Object Storage usando Python 3.12, a pesar de tener configurado correctamente el pool de conexiones, y solicita una solución alternativa.",
-          "evidencia_clave": "Error raro con el SDK de OCI en Python 3.12: al subir un objeto grande a Object Storage me tira timeout",
-          "resultado_json": {
-            "resumen": "El estudiante reporta un error de timeout al subir archivos grandes a OCI Object Storage usando Python 3.12, a pesar de tener configurado correctamente el pool de conexiones, y solicita una solución alternativa.",
-            "tema_libre": "Timeout en SDK de OCI con Python 3.12 y Object Storage",
-            "sentimiento": "Neutral",
-            "tipo_insight": "duda_recurrente",
-            "cita_extraida": "Error raro con el SDK de OCI en Python 3.12: al subir un objeto grande a Object Storage me tira timeout",
-            "tema_categoria": "Duda Técnica",
-            "razon_relevancia": "Es una duda técnica muy específica que involucra versiones recientes de software y servicios de nube, lo cual es valioso para crear guías de resolución de problemas o contenido técnico avanzado.",
-            "score_relevancia": 7
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "10",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "5",
-          "id_autor": "3",
-          "contenido": "El m??dulo de prompt engineering est?? excelente. Lo ??nico: me gustar??a m??s ejemplos de few-shot con outputs estructurados (JSON schema). El resto 10/10.",
-          "tipo_declarado": "feedback",
-          "identificador_origen": "2002002002002002010",
-          "momento_origen": "2026-10-13T17:10:56.901Z",
-          "autor": "Laura G??mez",
-          "canal": "feedback-cursos",
-          "sentimiento": "Muy Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "feedback",
-          "temas": [
-            "Prompt engineering con outputs estructurados"
-          ],
-          "resumen": "El estudiante califica el módulo de prompt engineering como excelente y sugiere incluir más ejemplos de few-shot con esquemas JSON.",
-          "evidencia_clave": "El m??dulo de prompt engineering est?? excelente. Lo ??nico: me gustar??a m??s ejemplos de few-shot con outputs estructurados (JSON schema).",
-          "resultado_json": {
-            "resumen": "El estudiante califica el módulo de prompt engineering como excelente y sugiere incluir más ejemplos de few-shot con esquemas JSON.",
-            "tema_libre": "Prompt engineering con outputs estructurados",
-            "sentimiento": "Muy Positivo",
-            "tipo_insight": "feedback",
-            "cita_extraida": "El m??dulo de prompt engineering est?? excelente. Lo ??nico: me gustar??a m??s ejemplos de few-shot con outputs estructurados (JSON schema).",
-            "tema_categoria": "Feedback de Curso",
-            "razon_relevancia": "Ofrece una valoración muy alta del curso junto con una sugerencia técnica específica y valiosa para mejorar el contenido educativo.",
-            "score_relevancia": 8
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "11",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "5",
-          "id_autor": "5",
-          "contenido": "La parte de evaluaci??n de agentes se siente un poco corta. Ser??a genial un lab donde midamos faithfulness y tool accuracy con un dataset chico.",
-          "tipo_declarado": "sugerencia",
-          "identificador_origen": "2002002002002002011",
-          "momento_origen": "2026-10-13T19:10:56.901Z",
-          "autor": "Sof??a P??rez",
-          "canal": "feedback-cursos",
-          "sentimiento": "Neutral",
-          "relevancia": "Alta",
-          "tipo_insight": "feedback",
-          "temas": [
-            "Evaluación de agentes y métricas de fidelidad"
-          ],
-          "resumen": "El estudiante sugiere profundizar en la sección de evaluación de agentes mediante un laboratorio práctico que mida la fidelidad y la precisión de las herramientas con un conjunto de datos pequeño.",
-          "evidencia_clave": "La parte de evaluaci??n de agentes se siente un poco corta. Ser??a genial un lab donde midamos faithfulness y tool accuracy",
-          "resultado_json": {
-            "resumen": "El estudiante sugiere profundizar en la sección de evaluación de agentes mediante un laboratorio práctico que mida la fidelidad y la precisión de las herramientas con un conjunto de datos pequeño.",
-            "tema_libre": "Evaluación de agentes y métricas de fidelidad",
-            "sentimiento": "Neutral",
-            "tipo_insight": "feedback",
-            "cita_extraida": "La parte de evaluaci??n de agentes se siente un poco corta. Ser??a genial un lab donde midamos faithfulness y tool accuracy",
-            "tema_categoria": "Feedback de Curso",
-            "razon_relevancia": "Proporciona una sugerencia técnica muy específica y de alto valor educativo, mencionando conceptos avanzados de IA que pueden convertirse en un nuevo módulo o recurso práctico.",
-            "score_relevancia": 9
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "id_actividad": "12",
-          "id_lote": "1",
-          "id_fuente": "1",
-          "id_canal": "5",
-          "id_autor": "6",
-          "contenido": "Termin?? el track de LangGraph. Antes no entend??a graphs; ahora arm?? un flujo de onboarding con human-in-the-loop y funciona. Gran curso.",
-          "tipo_declarado": "testimonio",
-          "identificador_origen": "2002002002002002012",
-          "momento_origen": "2026-10-13T21:10:56.901Z",
-          "autor": "Mart??n L??pez",
-          "canal": "feedback-cursos",
-          "sentimiento": "Muy Positivo",
-          "relevancia": "Alta",
-          "tipo_insight": "testimonio",
-          "temas": [
-            "Implementación de flujos con LangGraph"
-          ],
-          "resumen": "El estudiante completó el track de LangGraph y logró desarrollar un flujo de onboarding con human-in-the-loop, destacando su progreso en la comprensión de grafos.",
-          "evidencia_clave": "Antes no entendía graphs; ahora armé un flujo de onboarding con human-in-the-loop y funciona",
-          "resultado_json": {
-            "resumen": "El estudiante completó el track de LangGraph y logró desarrollar un flujo de onboarding con human-in-the-loop, destacando su progreso en la comprensión de grafos.",
-            "tema_libre": "Implementación de flujos con LangGraph",
-            "sentimiento": "Muy Positivo",
-            "tipo_insight": "testimonio",
-            "cita_extraida": "Antes no entendía graphs; ahora armé un flujo de onboarding con human-in-the-loop y funciona",
-            "tema_categoria": "Testimonio de Proyecto",
-            "razon_relevancia": "El mensaje describe un resultado tangible y técnico tras completar el curso, mostrando una transformación clara en el conocimiento del usuario, lo que lo hace ideal para casos de éxito.",
-            "score_relevancia": 9
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ],
-    "Generador de Post para LinkedIn": [
-      {
-        "json": {
-          "text": "¡Bienvenida a la comunidad, Laura Gómez! 🚀\n\nNada nos entusiasma más que ver a nuestros miembros dar el primer paso hacia nuevas fronteras tecnológicas. El aprendizaje continuo es el motor de nuestra industria, y hoy celebramos que Laura ha decidido sumergirse en el ecosistema de OCI y LangGraph.\n\nComo ella misma nos comparte: \"Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido\". Este espíritu de apertura y curiosidad es lo que construye grandes perfiles técnicos y fortalece nuestro entorno de colaboración.\n\nSabemos que el camino del aprendizaje se recorre mejor en compañía. Invitamos a toda la comunidad a dejar sus mejores recomendaciones y a inspirarse en este nuevo comienzo. ¡El éxito pertenece a quienes nunca dejan de aprender!\n\n#CloudComputing #LangGraph #LearningCommunity"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Analista de Contenido (LLM)": {
       "main": [
@@ -2074,6 +732,17 @@
           }
         ]
       ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generador de Post para LinkedIn",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -2081,7 +750,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "1526dffa-e2c4-4dec-99e6-9466d796092e",
+  "versionId": "16b0bb1e-8a12-4aea-8358-98a2bc8bec46",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"

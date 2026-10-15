@@ -3,33 +3,297 @@
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "PATCH",
-        "path": "communitylab/activos/:id_activo",
-        "responseMode": "responseNode",
-        "options": {}
+        "content": "## Endpoint: editar activo\n\n**Propósito:** actualizar el contenido de un activo existente y registrar una nueva versión mediante PostgreSQL.\n\n**HTTP:** `PATCH /communitylab/activos/:id_activo`  \n**Parámetro de ruta:** `id_activo` (entero positivo).  \n**Respuesta:** el Webhook usa `responseNode`; las ramas terminan en nodos explícitos de respuesta HTTP.\n\n### Solicitud\n\n```json\n{\n  \"contenido\": { \"text\": \"Nuevo contenido del activo\" },\n  \"motivo_cambio\": \"Corrección editorial\",\n  \"creado_por\": \"usuario_qa\"\n}\n```\n\nLos tres campos del body son obligatorios. `contenido` debe ser un objeto y `contenido.text` una cadena no vacía. `motivo_cambio` y `creado_por` deben ser cadenas no vacías.\n\n### Recorrido real\n\n1. **W1. Webhook — Editar Activo:** recibe el `PATCH`, el parámetro de ruta y el body JSON.\n2. **W2. Validar Solicitud de Edición:** valida el ID, la estructura del body, `contenido.text`, `motivo_cambio` y `creado_por`; limpia espacios en los textos. Produce `valido` y `errores`.\n3. **W3. IF — Solicitud Válida:** separa la solicitud válida de la inválida.\n   - **No válida → W4. Responder Error de Validación:** HTTP `400`, `codigo: BAD_REQUEST` y lista `errores`.\n   - **Válida → W5. PostgreSQL — Consultar Activo y Versión Actual:** lee el activo y su versión actual (`activo_generado` + `version_activo`).\n4. **W6.3. Crear Nueva Versión del Activo:** llama a `public.communitylab_editar_activo(id_activo, contenido, motivo_cambio, creado_por)`. La función es la encargada de aplicar la edición y el versionado. La consulta añade `status_http` y `resultado` para controlar la respuesta.\n5. **IF — Resultado edición:** si `status_http === 200`, continúa; de lo contrario, va a la respuesta de error.\n   - **Éxito → W5. PostgreSQL — Consultar Activo y Versión Actual1:** vuelve a leer los datos actualizados.\n   - **Responder éxito edición:** HTTP `200`, `success: true` y objeto `activo` con IDs, estado de curaduría, versión actual/aprobada, contenido y metadatos de versión.\n   - **Responder error edición:** responde con el `status_http` recibido; `404` se traduce en `NOT_FOUND`, los demás casos en `STATE_CONFLICT`.\n\n### Errores y observaciones técnicas\n\n- `400 BAD_REQUEST`: datos inválidos; incluye el detalle de cada campo.\n- `404 NOT_FOUND`: el ID no existe.\n- `409 STATE_CONFLICT`: el estado del activo impide editarlo.\n- La consulta de control contempla explícitamente `404` si el activo no existe y `409` si existe en estado `publicado` y la función no devuelve resultado. Verificar que la función cubra también cualquier otro estado no editable; de lo contrario, la consulta podría no devolver una fila para esa situación.\n- La definición de `public.communitylab_editar_activo` no aparece en el archivo `communitylab_db_v2.sql` suministrado; confirmar que la función esté creada en la base de datos de destino.\n- El workflow exportado está **inactivo** (`active: false`); revisar la activación antes de usar la URL de producción.\n\n**Secuencia resumida:** Webhook → Validar → IF válido → Consulta previa → Función de edición/versionado → IF resultado → (consulta final → HTTP 200) / (HTTP 404 o 409).",
+        "height": 828,
+        "width": 1884,
+        "color": "#0A1A33"
       },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
       "position": [
-        0,
-        0
+        -1296,
+        -288
       ],
-      "id": "190f2039-233a-498b-8cb0-484ec1451b7a",
-      "name": "W1. Webhook — Editar Activo",
-      "webhookId": "1f7e9bc3-7b80-4d34-a007-98287179bd7f"
+      "id": "ac2319a1-6d5e-4a0e-b52a-3896272e80d6",
+      "name": "DOC — Endpoint PATCH editar activo"
     },
     {
       "parameters": {
-        "jsCode": "\nconst entrada = $input.first().json;\nconst errores = [];\n\nconst idActivo = Number(entrada.params?.id_activo);\nconst body = entrada.body;\n\nif (\n  !entrada.params?.id_activo ||\n  !Number.isSafeInteger(idActivo) ||\n  idActivo <= 0\n) {\n  errores.push({\n    campo: \"id_activo\",\n    mensaje: \"El identificador del activo debe ser un entero positivo.\"\n  });\n}\n\nif (!body || typeof body !== \"object\" || Array.isArray(body)) {\n  errores.push({\n    campo: \"body\",\n    mensaje: \"El cuerpo de la solicitud debe ser un objeto JSON.\"\n  });\n}\n\nconst contenido = body?.contenido;\n\nif (\n  !contenido ||\n  typeof contenido !== \"object\" ||\n  Array.isArray(contenido)\n) {\n  errores.push({\n    campo: \"contenido\",\n    mensaje: \"Debe enviarse un objeto contenido.\"\n  });\n} else if (\n  typeof contenido.text !== \"string\" ||\n  !contenido.text.trim()\n) {\n  errores.push({\n    campo: \"contenido.text\",\n    mensaje: \"El texto del activo no puede estar vacío.\"\n  });\n}\n\nif (\n  typeof body?.motivo_cambio !== \"string\" ||\n  !body.motivo_cambio.trim()\n) {\n  errores.push({\n    campo: \"motivo_cambio\",\n    mensaje: \"Debes indicar el motivo de la edición.\"\n  });\n}\n\nif (\n  typeof body?.creado_por !== \"string\" ||\n  !body.creado_por.trim()\n) {\n  errores.push({\n    campo: \"creado_por\",\n    mensaje: \"Debes indicar quién realizó la edición.\"\n  });\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    id_activo: idActivo,\n    contenido: contenido ?? null,\n    motivo_cambio: body?.motivo_cambio?.trim() ?? null,\n    creado_por: body?.creado_por?.trim() ?? null\n  }\n}];\n"
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  mensaje: \"El activo fue actualizado correctamente y se creó una nueva versión.\",\n  activo: {\n    id_activo: $json.id_activo,\n    id_lote: $json.id_lote,\n    tipo_activo: $json.tipo_activo,\n    estado_curaduria: $json.estado_curaduria,\n    id_version_actual: $json.id_version_actual,\n    numero_version: $json.numero_version,\n    origen_version: $json.origen_version,\n    contenido: $json.contenido,\n    id_version_aprobada: $json.id_version_aprobada\n  }\n}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2336,
+        -144
+      ],
+      "id": "83e61bfe-9512-48f1-91fe-1260f0372234",
+      "name": "Responder éxito edición"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"error\", codigo: $json.status_http === 404 ? \"NOT_FOUND\" : \"STATE_CONFLICT\", mensaje: $json.status_http === 404 ? \"No existe un activo con el identificador indicado.\" : \"El estado actual del activo no permite realizar esta operación.\", id_activo: $json.id_activo ?? null, estado_actual: $json.estado_curaduria ?? null }) }}",
+        "options": {
+          "responseCode": "={{ $json.status_http }}"
+        }
+      },
+      "id": "96f3461c-fcbc-4d0d-bc20-b0579bcd6025",
+      "name": "Responder error rechazo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2144,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "da49ba42-d34c-4b62-86c7-d7639dc3824c",
+              "leftValue": "={{ $json.status_http === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "eff36133-435f-4d6e-a398-19f3b2392e7c",
+      "name": "IF — Resultado rechazo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1904,
+        1616
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"error\", codigo: $json.status_http === 404 ? \"NOT_FOUND\" : \"STATE_CONFLICT\", mensaje: $json.status_http === 404 ? \"No existe un activo con el identificador indicado.\" : \"El estado actual del activo no permite realizar esta operación.\", id_activo: $json.id_activo ?? null, estado_actual: $json.estado_curaduria ?? null }) }}",
+        "options": {
+          "responseCode": "={{ $json.status_http }}"
+        }
+      },
+      "id": "bb87bb67-2673-4faf-9fe3-9c70a307d44e",
+      "name": "Responder error aprobación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8e3ac6ce-6720-4659-8d1e-3fd8e3d18ec3",
+              "leftValue": "={{ $json.status_http === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "071c0a3b-6a49-4fb5-aa42-179458beadbc",
+      "name": "IF — Resultado aprobación",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1872,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"error\", codigo: $json.status_http === 404 ? \"NOT_FOUND\" : \"STATE_CONFLICT\", mensaje: $json.status_http === 404 ? \"No existe un activo con el identificador indicado.\" : \"El estado actual del activo no permite realizar esta operación.\", id_activo: $json.id_activo ?? null, estado_actual: $json.estado_curaduria ?? null }) }}",
+        "options": {
+          "responseCode": "={{ $json.status_http }}"
+        }
+      },
+      "id": "0038969d-623d-46ff-8216-61a739ec4026",
+      "name": "Responder error edición",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "958d4b9e-cf62-46a9-b033-02fe3cebd599",
+              "leftValue": "={{ $json.status_http === 200 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "96311499-7fdd-4560-8b53-15898488fa69",
+      "name": "IF — Resultado edición",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1888,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  mensaje: \"El activo fue aprobado correctamente.\",\n  activo: {\n    id_activo: $json.id_activo,\n    id_lote: $json.id_lote,\n    tipo_activo: $json.tipo_activo,\n    estado_curaduria: $json.estado_curaduria,\n    id_version_actual: $json.id_version_actual,\n    id_version_aprobada: $json.id_version_aprobada,\n    comentario_curaduria: $json.comentario_curaduria,\n    revisado_en: $json.revisado_en\n  }\n}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2112,
+        672
+      ],
+      "id": "e0476f8e-337b-42f2-a982-a2e1e9f07dad",
+      "name": "Webhook - Respuesta Aprobacion"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({\n  success: true,\n  mensaje: \"El activo fue rechazado correctamente.\",\n  activo: {\n    id_activo: $json.id_activo,\n    id_lote: $json.id_lote,\n    tipo_activo: $json.tipo_activo,\n    estado_curaduria: $json.estado_curaduria,\n    id_version_actual: $json.id_version_actual,\n    id_version_aprobada: $json.id_version_aprobada,\n    comentario_curaduria: $json.comentario_curaduria,\n    revisado_en: $json.revisado_en\n  }\n}) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2144,
+        1536
+      ],
+      "id": "77b4e526-cf11-4112-832b-7f595684adb2",
+      "name": "Webhook - Respuesta Rechazo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first()?.json ?? {};\n\nconst errores = [];\n\nconst idActivo = Number(entrada.params?.id_activo);\nconst body = entrada.body ?? {};\n\nif (\n  !Number.isSafeInteger(idActivo) ||\n  idActivo <= 0\n) {\n  errores.push(\n    \"id_activo debe ser un entero positivo.\"\n  );\n}\n\nconst revisadoPor =\n  typeof body.revisado_por === \"string\"\n    ? body.revisado_por.trim()\n    : \"\";\n\nif (!revisadoPor) {\n  errores.push(\n    \"revisado_por es obligatorio.\"\n  );\n}\n\nconst comentario = body.comentario_curaduria;\n\nif (\n  comentario !== undefined &&\n  comentario !== null &&\n  typeof comentario !== \"string\"\n) {\n  errores.push(\n    \"comentario_curaduria debe ser una cadena de texto.\"\n  );\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    id_activo: idActivo,\n    comentario_curaduria:\n      typeof comentario === \"string\"\n        ? comentario.trim()\n        : null,\n    revisado_por: revisadoPor\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        0
+        1008,
+        1712
       ],
-      "id": "1c44e525-0878-4d01-bdcc-196fd750c95b",
-      "name": "W2. Validar Solicitud de Edición"
+      "id": "41b052e0-bf1c-4379-85d8-b3891b8a2c12",
+      "name": "W2. Validar Solicitud de Rechazo"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH actualizado AS (\n    UPDATE activo_generado\n    SET estado_curaduria = 'rechazado',\n        comentario_curaduria = $2,\n        revisado_en = NOW(),\n        actualizado_en = NOW()\n    WHERE id_activo = $1\n      AND estado_curaduria IN ('borrador', 'aprobado')\n    RETURNING id_activo, id_lote, tipo_activo, estado_curaduria,\n              id_version_actual, id_version_aprobada,\n              comentario_curaduria, revisado_en, actualizado_en\n), existente AS (\n    SELECT id_activo, id_lote, tipo_activo, estado_curaduria,\n           id_version_actual, id_version_aprobada,\n           comentario_curaduria, revisado_en, actualizado_en\n    FROM activo_generado WHERE id_activo = $1\n)\nSELECT u.*, 200::integer AS status_http, 'ok'::text AS resultado\nFROM actualizado u\nUNION ALL\nSELECT e.id_activo, e.id_lote, e.tipo_activo, e.estado_curaduria,\n       e.id_version_actual, e.id_version_aprobada, e.comentario_curaduria,\n       e.revisado_en, e.actualizado_en,\n       CASE WHEN e.id_activo IS NULL THEN 404 ELSE 409 END::integer AS status_http,\n       CASE WHEN e.id_activo IS NULL THEN 'not_found' ELSE 'state_conflict' END::text AS resultado\nFROM (SELECT 1) x\nLEFT JOIN existente e ON TRUE\nWHERE NOT EXISTS (SELECT 1 FROM actualizado);",
+        "options": {
+          "queryReplacement": "={{ [ $(\"W2. Validar Solicitud de Rechazo\").first().json.id_activo, $(\"W2. Validar Solicitud de Rechazo\").first().json.comentario_curaduria ?? \"\" ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1680,
+        1616
+      ],
+      "id": "de954952-9632-4a73-9e88-88a535fc7bd3",
+      "name": "W6. Registrar Rechazo de Activo",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "=\n{{ JSON.stringify({\n  status: \"error\",\n  codigo: \"BAD_REQUEST\",\n  mensaje: \"La solicitud de curaduría contiene errores de validación.\",\n  errores: $json.errores\n}) }}\n",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1456,
+        1808
+      ],
+      "id": "f7eb7624-742e-4130-9e04-0c82b171db17",
+      "name": "W4. Responder Error de Validación En Aprobacion1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.id_activo }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1456,
+        1616
+      ],
+      "id": "66dd742f-b6f4-41c3-ab4a-bd4c4e643acd",
+      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual4",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
     },
     {
       "parameters": {
@@ -58,16 +322,39 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        432,
-        0
+        1232,
+        1712
       ],
-      "id": "3e25d5bd-1a4a-49ea-95ea-a4d2d8f40890",
-      "name": "W3. IF — Solicitud Válida"
+      "id": "f86cce2a-1e56-4cce-92ed-538dfb078434",
+      "name": "W3. IF — Solicitud Válida2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH actualizado AS (\n    UPDATE activo_generado\n    SET estado_curaduria = 'aprobado',\n        id_version_aprobada = id_version_actual,\n        comentario_curaduria = $2,\n        revisado_en = NOW(),\n        actualizado_en = NOW()\n    WHERE id_activo = $1\n      AND estado_curaduria = 'borrador'\n      AND id_version_actual IS NOT NULL\n    RETURNING id_activo, id_lote, tipo_activo, estado_curaduria,\n              id_version_actual, id_version_aprobada,\n              comentario_curaduria, revisado_en, actualizado_en\n), existente AS (\n    SELECT id_activo, id_lote, tipo_activo, estado_curaduria,\n           id_version_actual, id_version_aprobada,\n           comentario_curaduria, revisado_en, actualizado_en\n    FROM activo_generado WHERE id_activo = $1\n)\nSELECT u.*, 200::integer AS status_http, 'ok'::text AS resultado\nFROM actualizado u\nUNION ALL\nSELECT e.id_activo, e.id_lote, e.tipo_activo, e.estado_curaduria,\n       e.id_version_actual, e.id_version_aprobada, e.comentario_curaduria,\n       e.revisado_en, e.actualizado_en,\n       CASE WHEN e.id_activo IS NULL THEN 404 ELSE 409 END::integer AS status_http,\n       CASE WHEN e.id_activo IS NULL THEN 'not_found' ELSE 'state_conflict' END::text AS resultado\nFROM (SELECT 1) x\nLEFT JOIN existente e ON TRUE\nWHERE NOT EXISTS (SELECT 1 FROM actualizado);",
+        "options": {
+          "queryReplacement": "={{ [ $(\"W2. Validar Solicitud de Aprobacion\").first().json.id_activo, $(\"W2. Validar Solicitud de Aprobacion\").first().json.comentario_curaduria ?? \"\" ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1648,
+        752
+      ],
+      "id": "da1cfcbb-e5d8-4cef-8b7a-c5f2f0e4c3bd",
+      "name": "W6. Aprobar Activo y Registrar Versión Aprobada",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "=\n{{ JSON.stringify({\n  status: \"error\",\n  codigo: \"BAD_REQUEST\",\n  mensaje: \"La solicitud de edición contiene errores de validación.\",\n  errores: $json.errores\n}) }}\n",
+        "responseBody": "=\n{{ JSON.stringify({\n  status: \"error\",\n  codigo: \"BAD_REQUEST\",\n  mensaje: \"La solicitud de curaduría contiene errores de validación.\",\n  errores: $json.errores\n}) }}\n",
         "options": {
           "responseCode": 400
         }
@@ -75,26 +362,99 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        672,
-        128
+        1424,
+        944
       ],
-      "id": "c2b250c2-4de6-4e77-a763-9b2d97fcb6ea",
-      "name": "W4. Responder Error de Validación"
+      "id": "51f4e174-2517-44ed-8a44-ef0f30d2304d",
+      "name": "W4. Responder Error de Validación En Aprobacion"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first()?.json ?? {};\n\nconst errores = [];\n\nconst idActivo = Number(entrada.params?.id_activo);\nconst body = entrada.body ?? {};\n\nif (\n  !Number.isSafeInteger(idActivo) ||\n  idActivo <= 0\n) {\n  errores.push(\n    \"id_activo debe ser un entero positivo.\"\n  );\n}\n\nconst revisadoPor =\n  typeof body.revisado_por === \"string\"\n    ? body.revisado_por.trim()\n    : \"\";\n\nif (!revisadoPor) {\n  errores.push(\n    \"revisado_por es obligatorio.\"\n  );\n}\n\nconst comentario = body.comentario_curaduria;\n\nif (\n  comentario !== undefined &&\n  comentario !== null &&\n  typeof comentario !== \"string\"\n) {\n  errores.push(\n    \"comentario_curaduria debe ser una cadena de texto.\"\n  );\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    id_activo: idActivo,\n    comentario_curaduria:\n      typeof comentario === \"string\"\n        ? comentario.trim()\n        : null,\n    revisado_por: revisadoPor\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        848
+      ],
+      "id": "4bbd0be6-b3b4-4b2a-a6f1-ab7974f12fbc",
+      "name": "W2. Validar Solicitud de Aprobacion"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nSELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = {{ $json.id_activo }};\n",
-        "options": {}
+        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.id_activo }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        688,
-        -176
+        1424,
+        752
       ],
-      "id": "ce0e8bf7-6be6-4ba6-993f-9aba453048f6",
-      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual",
+      "id": "ece20d99-aa95-4bb1-ba7b-70e6e2136db0",
+      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "362c4fb0-7aad-478b-9a62-84a82989dc57",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1200,
+        848
+      ],
+      "id": "ca441cd5-9672-45ff-a6ab-f6bcfe70983d",
+      "name": "W3. IF — Solicitud Válida1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.id_activo }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2112,
+        -144
+      ],
+      "id": "ae83b9e0-2660-4b2d-9a92-909f9573fa3a",
+      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual1",
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "WqrsMGAPtexw6pvx",
@@ -105,16 +465,18 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nWITH entrada AS (\n    SELECT\n        CAST(\n            '{{ $(\"W1. Webhook — Editar Activo\").first().json.params.id_activo }}'\n            AS BIGINT\n        ) AS id_activo,\n\n        '{{ JSON.stringify($(\"W1. Webhook — Editar Activo\").first().json.body.contenido).replace(/'/g, \"''\") }}'\n            ::JSONB AS contenido,\n\n        '{{ $(\"W1. Webhook — Editar Activo\").first().json.body.motivo_cambio || \"Edición de contenido\" }}'\n            AS motivo_cambio,\n\n        '{{ $(\"W1. Webhook — Editar Activo\").first().json.body.creado_por || \"usuario_curador\" }}'\n            AS creado_por\n),\nactivo AS (\n    SELECT\n        ag.id_activo,\n        ag.id_version_actual,\n        COALESCE(MAX(va.numero_version), 0) AS ultima_version\n    FROM activo_generado ag\n    LEFT JOIN version_activo va\n        ON va.id_activo = ag.id_activo\n    JOIN entrada e\n        ON e.id_activo = ag.id_activo\n    GROUP BY\n        ag.id_activo,\n        ag.id_version_actual\n),\nnueva_version AS (\n    INSERT INTO version_activo (\n        id_activo,\n        numero_version,\n        contenido,\n        origen_version,\n        motivo_cambio,\n        creado_por\n    )\n    SELECT\n        a.id_activo,\n        a.ultima_version + 1,\n        e.contenido,\n        'usuario',\n        e.motivo_cambio,\n        e.creado_por\n    FROM activo a\n    CROSS JOIN entrada e\n    RETURNING\n        id_version,\n        id_activo,\n        numero_version,\n        contenido,\n        origen_version,\n        motivo_cambio,\n        creado_por,\n        creado_en\n),\nactualizacion AS (\n    UPDATE activo_generado ag\n    SET\n        contenido = nv.contenido,\n        id_version_actual = nv.id_version,\n        actualizado_en = NOW(),\n        estado_curaduria = 'borrador'\n    FROM nueva_version nv\n    WHERE ag.id_activo = nv.id_activo\n    RETURNING\n        ag.id_activo,\n        ag.id_lote,\n        ag.tipo_activo,\n        ag.estado_curaduria,\n        ag.id_version_actual,\n        ag.id_version_aprobada,\n        ag.actualizado_en\n)\nSELECT\n    ac.id_activo,\n    ac.id_lote,\n    ac.tipo_activo,\n    ac.estado_curaduria,\n    ac.id_version_actual,\n    nv.numero_version,\n    nv.origen_version,\n    nv.contenido,\n    nv.motivo_cambio,\n    nv.creado_por,\n    nv.creado_en\nFROM actualizacion ac\nJOIN nueva_version nv\n    ON nv.id_activo = ac.id_activo\nORDER BY ac.id_activo;\n",
-        "options": {}
+        "query": "WITH resultado AS (\n    SELECT *\n    FROM public.communitylab_editar_activo($1, $2::jsonb, $3, $4)\n),\nactivo AS (\n    SELECT id_activo, estado_curaduria\n    FROM activo_generado\n    WHERE id_activo = $1\n)\nSELECT r.*, 200::integer AS status_http, 'ok'::text AS resultado\nFROM resultado r\nUNION ALL\nSELECT\n    NULL::bigint AS id_activo,\n    NULL::bigint AS id_lote,\n    NULL::varchar(50) AS tipo_activo,\n    NULL::varchar(30) AS estado_curaduria,\n    NULL::bigint AS id_version_actual,\n    NULL::bigint AS id_version_aprobada,\n    NULL::timestamptz AS actualizado_en,\n    NULL::integer AS numero_version,\n    NULL::varchar(20) AS origen_version,\n    NULL::jsonb AS contenido,\n    NULL::text AS motivo_cambio,\n    NULL::varchar(150) AS creado_por,\n    NULL::timestamptz AS creado_en,\n    CASE WHEN a.id_activo IS NULL THEN 404 ELSE 409 END::integer AS status_http,\n    CASE WHEN a.id_activo IS NULL THEN 'not_found' ELSE 'state_conflict' END::text AS resultado\nFROM (SELECT 1) x\nLEFT JOIN activo a ON TRUE\nWHERE NOT EXISTS (SELECT 1 FROM resultado)\n  AND (a.id_activo IS NULL OR a.estado_curaduria = 'publicado');",
+        "options": {
+          "queryReplacement": "={{ [ $(\"W1. Webhook — Editar Activo\").first().json.params.id_activo, $(\"W2. Validar Solicitud de Edición\").first().json.contenido, $(\"W2. Validar Solicitud de Edición\").first().json.motivo_cambio, $(\"W2. Validar Solicitud de Edición\").first().json.creado_por ] }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        912,
-        -176
+        1664,
+        -48
       ],
-      "id": "6af18644-d3c0-4dce-ae2c-65ec061558de",
+      "id": "e2abbd62-543b-4055-80b0-50f4cf64090f",
       "name": "W6.3. Crear Nueva Versión del Activo",
       "credentials": {
         "postgres": {
@@ -126,17 +488,20 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nSELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = {{ $json.id_activo }};\n",
-        "options": {}
+        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = $1;",
+        "options": {
+          "queryReplacement": "={{ $json.id_activo }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1104,
-        -176
+        1440,
+        -48
       ],
-      "id": "b2e5aaed-aa0d-449b-bd27-ee2fbb4c6bcb",
-      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual1",
+      "id": "3346a60a-608e-43d9-9e0a-c3cc268cb627",
+      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual",
+      "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "WqrsMGAPtexw6pvx",
@@ -146,279 +511,149 @@
     },
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "communitylab/activos/:id_activo/aprobar",
+        "respondWith": "json",
+        "responseBody": "=\n{{ JSON.stringify({\n  status: \"error\",\n  codigo: \"BAD_REQUEST\",\n  mensaje: \"La solicitud de edición contiene errores de validación.\",\n  errores: $json.errores\n}) }}\n",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1440,
+        144
+      ],
+      "id": "dd1cd4b7-b333-4950-b181-4eb7186bcb92",
+      "name": "W4. Responder Error de Validación"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "362c4fb0-7aad-478b-9a62-84a82989dc57",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        48
+      ],
+      "id": "a7edfbf4-fe64-4991-876c-75f2fff0a3ac",
+      "name": "W3. IF — Solicitud Válida"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst entrada = $input.first().json;\nconst errores = [];\n\nconst idActivo = Number(entrada.params?.id_activo);\nconst body = entrada.body;\n\nif (\n  !entrada.params?.id_activo ||\n  !Number.isSafeInteger(idActivo) ||\n  idActivo <= 0\n) {\n  errores.push({\n    campo: \"id_activo\",\n    mensaje: \"El identificador del activo debe ser un entero positivo.\"\n  });\n}\n\nif (!body || typeof body !== \"object\" || Array.isArray(body)) {\n  errores.push({\n    campo: \"body\",\n    mensaje: \"El cuerpo de la solicitud debe ser un objeto JSON.\"\n  });\n}\n\nconst contenido = body?.contenido;\n\nif (\n  !contenido ||\n  typeof contenido !== \"object\" ||\n  Array.isArray(contenido)\n) {\n  errores.push({\n    campo: \"contenido\",\n    mensaje: \"Debe enviarse un objeto contenido.\"\n  });\n} else if (\n  typeof contenido.text !== \"string\" ||\n  !contenido.text.trim()\n) {\n  errores.push({\n    campo: \"contenido.text\",\n    mensaje: \"El texto del activo no puede estar vacío.\"\n  });\n}\n\nif (\n  typeof body?.motivo_cambio !== \"string\" ||\n  !body.motivo_cambio.trim()\n) {\n  errores.push({\n    campo: \"motivo_cambio\",\n    mensaje: \"Debes indicar el motivo de la edición.\"\n  });\n}\n\nif (\n  typeof body?.creado_por !== \"string\" ||\n  !body.creado_por.trim()\n) {\n  errores.push({\n    campo: \"creado_por\",\n    mensaje: \"Debes indicar quién realizó la edición.\"\n  });\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    id_activo: idActivo,\n    contenido: contenido ?? null,\n    motivo_cambio: body?.motivo_cambio?.trim() ?? null,\n    creado_por: body?.creado_por?.trim() ?? null\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        48
+      ],
+      "id": "0a272199-4ffa-41e0-88a5-8f3635f46e6f",
+      "name": "W2. Validar Solicitud de Edición"
+    },
+    {
+      "parameters": {
+        "httpMethod": "PATCH",
+        "path": "communitylab/activos/:id_activo",
+        "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -32,
-        624
+        768,
+        48
       ],
-      "id": "f0cc6cb7-5072-4f77-a026-76478659a2f0",
+      "id": "99148e30-8828-46be-aa4e-f61aa2632571",
+      "name": "W1. Webhook — Editar Activo",
+      "webhookId": "1f7e9bc3-7b80-4d34-a007-98287179bd7f"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "communitylab/activos/:id_activo/aprobar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        752,
+        848
+      ],
+      "id": "a4613ac1-6f80-4050-b85e-ca0cecc4be8e",
       "name": "Webhook - Aprobar activo",
       "webhookId": "69344a5d-8358-4fef-8918-f82ddfc7d829"
     },
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "/communitylab/activos/:id_activo/rechazar",
+        "path": "communitylab/activos/:id_activo/rechazar",
+        "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -32,
-        1360
+        784,
+        1712
       ],
-      "id": "c1e3bdff-806e-4d3b-8a59-bf7c2f8e72f6",
+      "id": "fb4e5484-6516-4742-85f3-b176240e0fed",
       "name": "Webhook - Rechazar activo",
       "webhookId": "f0d4835d-6e22-4a38-a508-272d557b5da1"
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "362c4fb0-7aad-478b-9a62-84a82989dc57",
-              "leftValue": "={{ $json.valido }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
+        "content": "## Endpoint: aprobar activo\n\n**Propósito:** aprobar la versión actual de un activo en curaduría y registrar qué versión queda aprobada.\n\n**HTTP:** `POST /communitylab/activos/:id_activo/aprobar`  \n**Parámetro de ruta:** `id_activo` (entero positivo).\n\n### Solicitud\n\n```json\n{\n  \"comentario_curaduria\": \"News revisado y aprobado.\",\n  \"revisado_por\": \"usuario_curador\"\n}\n```\n\n`revisado_por` es obligatorio y debe ser una cadena no vacía. `comentario_curaduria` es opcional; si se envía, debe ser texto o `null`.\n\n### Recorrido real\n\n1. **Webhook - Aprobar activo:** recibe la petición `POST`.\n2. **W2. Validar Solicitud de Aprobacion:** valida el ID, exige `revisado_por` y comprueba el tipo de `comentario_curaduria`. Normaliza el comentario y genera `valido`/`errores`.\n3. **W3. IF — Solicitud Válida1:** dirige la solicitud según el resultado de validación.\n   - **No válida → W4. Responder Error de Validación En Aprobacion:** HTTP `400`, `BAD_REQUEST` y lista de errores.\n   - **Válida → W5. PostgreSQL — Consultar Activo y Versión Actual2:** consulta el activo y la versión actual. Esta lectura previa no decide por sí sola si se puede aprobar; la actualización siguiente aplica las condiciones.\n4. **W6. Aprobar Activo y Registrar Versión Aprobada:** actualiza `activo_generado` solo si el activo existe, está en estado `borrador` y tiene `id_version_actual`. Cambia el estado a `aprobado`, copia `id_version_actual` a `id_version_aprobada`, guarda el comentario y actualiza `revisado_en`/`actualizado_en`.\n5. **IF — Resultado aprobación:** comprueba `status_http`.\n   - **HTTP 200 → Webhook - Respuesta Aprobacion:** devuelve `success: true` y los datos del activo, incluidas las versiones, el comentario y la fecha de revisión.\n   - **Error → Responder error aprobación:** devuelve `404 NOT_FOUND` si el activo no existe; en otro caso, `409 STATE_CONFLICT`, indicando que el estado no permite la operación.\n\n### Reglas y observaciones\n\n- La aprobación solo procede desde `borrador` y si existe una versión actual.\n- `400`: solicitud inválida. `404`: activo inexistente. `409`: estado incompatible o falta de condiciones para aprobar.\n- **Pendiente técnico:** `revisado_por` se valida y queda disponible en la salida del nodo de validación, pero la consulta SQL de aprobación no lo persiste en `activo_generado` ni en otra tabla visible en este flujo. Si se requiere auditoría de quién aprobó, debe incorporarse explícitamente.\n- La consulta SQL produce `409` para cualquier activo existente cuando el `UPDATE` no modifica filas.\n\n**Secuencia resumida:** Webhook → Validar → IF válido → Consulta previa → UPDATE condicionado (aprobar + fijar versión aprobada) → IF resultado → respuesta HTTP 200 / 404 / 409.",
+        "height": 736,
+        "width": 1900,
+        "color": "#153225"
       },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
       "position": [
-        432,
-        624
+        -1296,
+        576
       ],
-      "id": "0dd3637a-640c-4828-ad00-a923b329f4c9",
-      "name": "W3. IF — Solicitud Válida1"
+      "id": "ec936658-7199-426e-a549-9ad11edbef55",
+      "name": "DOC — Endpoint POST aprobar activo"
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = {{ $json.id_activo }};\n",
-        "options": {}
+        "content": "## Endpoint: rechazar activo\n\n**Propósito:** marcar un activo como rechazado y guardar el comentario de curaduría.\n\n**HTTP:** `POST /communitylab/activos/:id_activo/rechazar`  \n**Parámetro de ruta:** `id_activo` (entero positivo).\n\n### Solicitud\n\n```json\n{\n  \"comentario_curaduria\": \"News fuera de tono.\",\n  \"revisado_por\": \"usuario_curador\"\n}\n```\n\n`revisado_por` es obligatorio y debe ser una cadena no vacía. `comentario_curaduria` es opcional; si se envía, debe ser texto o `null`.\n\n### Recorrido real\n\n1. **Webhook - Rechazar activo:** recibe la petición `POST`.\n2. **W2. Validar Solicitud de Rechazo:** valida el ID, exige `revisado_por` y comprueba el tipo de `comentario_curaduria`. Normaliza el comentario y genera `valido`/`errores`.\n3. **W3. IF — Solicitud Válida2:** separa solicitudes válidas e inválidas.\n   - **No válida → W4. Responder Error de Validación En Aprobacion1:** HTTP `400`, `BAD_REQUEST` y lista de errores.\n   - **Válida → W5. PostgreSQL — Consultar Activo y Versión Actual4:** consulta el activo y su versión actual; la decisión final se toma en el `UPDATE`.\n4. **W6. Registrar Rechazo de Activo:** cambia `estado_curaduria` a `rechazado`, guarda `comentario_curaduria` y actualiza `revisado_en`/`actualizado_en`. Solo modifica activos cuyo estado sea `borrador` o `aprobado`.\n5. **IF — Resultado rechazo:** comprueba `status_http`.\n   - **HTTP 200 → Webhook - Respuesta Rechazo:** devuelve `success: true` y los datos del activo, estado, versiones, comentario y fecha de revisión.\n   - **Error → Responder error rechazo:** devuelve `404 NOT_FOUND` si el activo no existe; en otro caso, `409 STATE_CONFLICT`.\n\n### Reglas y observaciones\n\n- El rechazo se permite desde `borrador` o `aprobado`; otros estados producen conflicto.\n- `400`: solicitud inválida. `404`: activo inexistente. `409`: estado incompatible.\n- **Pendiente técnico:** `revisado_por` se valida, pero la consulta SQL de rechazo no lo persiste. Si se necesita trazabilidad del responsable, debe guardarse explícitamente.\n- Si se rechaza un activo que ya estaba aprobado, la consulta no limpia `id_version_aprobada`; el campo conserva el valor previo. Confirmar si ese comportamiento es el deseado para el modelo de curaduría.\n\n**Secuencia resumida:** Webhook → Validar → IF válido → Consulta previa → UPDATE condicionado (marcar rechazado) → IF resultado → respuesta HTTP 200 / 404 / 409.",
+        "height": 688,
+        "width": 1916,
+        "color": "#2A2323"
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
       "position": [
-        736,
-        448
+        -1296,
+        1392
       ],
-      "id": "9998dd42-b9e5-4d31-8e84-6d5971a69c27",
-      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual2",
-      "credentials": {
-        "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const entrada = $input.first()?.json ?? {};\n\nconst errores = [];\n\nconst idActivo = Number(entrada.params?.id_activo);\nconst body = entrada.body ?? {};\n\nif (\n  !Number.isSafeInteger(idActivo) ||\n  idActivo <= 0\n) {\n  errores.push(\n    \"id_activo debe ser un entero positivo.\"\n  );\n}\n\nconst revisadoPor =\n  typeof body.revisado_por === \"string\"\n    ? body.revisado_por.trim()\n    : \"\";\n\nif (!revisadoPor) {\n  errores.push(\n    \"revisado_por es obligatorio.\"\n  );\n}\n\nconst comentario = body.comentario_curaduria;\n\nif (\n  comentario !== undefined &&\n  comentario !== null &&\n  typeof comentario !== \"string\"\n) {\n  errores.push(\n    \"comentario_curaduria debe ser una cadena de texto.\"\n  );\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    id_activo: idActivo,\n    comentario_curaduria:\n      typeof comentario === \"string\"\n        ? comentario.trim()\n        : null,\n    revisado_por: revisadoPor\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        192,
-        624
-      ],
-      "id": "11f206de-029e-416e-ac53-c31a6e6626ce",
-      "name": "W2. Validar Solicitud de Aprobacion"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "=\n{{ JSON.stringify({\n  status: \"error\",\n  codigo: \"BAD_REQUEST\",\n  mensaje: \"La solicitud de edición contiene errores de validación.\",\n  errores: $json.errores\n}) }}\n",
-        "options": {
-          "responseCode": 400
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        672,
-        752
-      ],
-      "id": "e3c4fd94-b2af-4c58-b130-5121f188e3b7",
-      "name": "W4. Responder Error de Validación En Aprobacion"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "\nUPDATE activo_generado\nSET\n    estado_curaduria = 'aprobado',\n    id_version_aprobada = id_version_actual,\n    comentario_curaduria = '{{ $(\"W2. Validar Solicitud de Aprobacion\").first().json.comentario_curaduria }}',\n    revisado_en = NOW(),\n    actualizado_en = NOW()\nWHERE id_activo = {{\n    $(\"W2. Validar Solicitud de Aprobacion\").first().json.id_activo\n}}\n  AND estado_curaduria = 'borrador'\n  AND id_version_actual IS NOT NULL\nRETURNING\n    id_activo,\n    id_lote,\n    tipo_activo,\n    estado_curaduria,\n    id_version_actual,\n    id_version_aprobada,\n    comentario_curaduria,\n    revisado_en,\n    actualizado_en;\n",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
-        960,
-        448
-      ],
-      "id": "ec6c878e-685f-44d7-9258-21f60e002b27",
-      "name": "W6. Aprobar Activo y Registrar Versión Aprobada",
-      "credentials": {
-        "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "362c4fb0-7aad-478b-9a62-84a82989dc57",
-              "leftValue": "={{ $json.valido }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        448,
-        1360
-      ],
-      "id": "433621fd-5c84-409c-b487-2050250b5e9c",
-      "name": "W3. IF — Solicitud Válida2"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.contenido AS contenido_version_actual,\n    ag.id_version_aprobada\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_activo = {{ $json.id_activo }};\n",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
-        752,
-        1184
-      ],
-      "id": "a63e40fb-19bb-4b05-9f74-bab18bc3e820",
-      "name": "W5. PostgreSQL — Consultar Activo y Versión Actual4",
-      "credentials": {
-        "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "=\n{{ JSON.stringify({\n  status: \"error\",\n  codigo: \"BAD_REQUEST\",\n  mensaje: \"La solicitud de edición contiene errores de validación.\",\n  errores: $json.errores\n}) }}\n",
-        "options": {
-          "responseCode": 400
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        688,
-        1488
-      ],
-      "id": "5d9f2add-a344-4c64-9be1-d28ed319b9e2",
-      "name": "W4. Responder Error de Validación En Aprobacion1"
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "\nUPDATE activo_generado\nSET\n    estado_curaduria = 'rechazado',\n    comentario_curaduria = '{{ $(\"W2. Validar Solicitud de Rechazo\").first().json.comentario_curaduria.replace(/'/g, \"''\") }}',\n    revisado_en = NOW(),\n    actualizado_en = NOW()\nWHERE id_activo = {{ $(\"W2. Validar Solicitud de Rechazo\").first().json.id_activo }}\n  AND estado_curaduria IN ('borrador', 'aprobado')\nRETURNING\n    id_activo,\n    id_lote,\n    tipo_activo,\n    estado_curaduria,\n    id_version_actual,\n    id_version_aprobada,\n    comentario_curaduria,\n    revisado_en,\n    actualizado_en;\n",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.7,
-      "position": [
-        976,
-        1184
-      ],
-      "id": "36339502-132d-4fc6-93b2-7ae83231dbf7",
-      "name": "W6. Registrar Rechazo de Activo",
-      "credentials": {
-        "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const entrada = $input.first()?.json ?? {};\n\nconst errores = [];\n\nconst idActivo = Number(entrada.params?.id_activo);\nconst body = entrada.body ?? {};\n\nif (\n  !Number.isSafeInteger(idActivo) ||\n  idActivo <= 0\n) {\n  errores.push(\n    \"id_activo debe ser un entero positivo.\"\n  );\n}\n\nconst revisadoPor =\n  typeof body.revisado_por === \"string\"\n    ? body.revisado_por.trim()\n    : \"\";\n\nif (!revisadoPor) {\n  errores.push(\n    \"revisado_por es obligatorio.\"\n  );\n}\n\nconst comentario = body.comentario_curaduria;\n\nif (\n  comentario !== undefined &&\n  comentario !== null &&\n  typeof comentario !== \"string\"\n) {\n  errores.push(\n    \"comentario_curaduria debe ser una cadena de texto.\"\n  );\n}\n\nreturn [{\n  json: {\n    valido: errores.length === 0,\n    errores,\n    id_activo: idActivo,\n    comentario_curaduria:\n      typeof comentario === \"string\"\n        ? comentario.trim()\n        : null,\n    revisado_por: revisadoPor\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        208,
-        1360
-      ],
-      "id": "40a8363f-ca4b-4201-911d-94a10cb58c9c",
-      "name": "W2. Validar Solicitud de Rechazo"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "=\n{\n  \"success\": true,\n  \"mensaje\": \"El activo fue rechazado correctamente.\",\n  \"activo\": {\n    \"id_activo\": \"{{ $json.id_activo }}\",\n    \"id_lote\": \"{{ $json.id_lote }}\",\n    \"tipo_activo\": \"{{ $json.tipo_activo }}\",\n    \"estado_curaduria\": \"{{ $json.estado_curaduria }}\",\n    \"id_version_actual\": \"{{ $json.id_version_actual }}\",\n    \"id_version_aprobada\": \"{{ $json.id_version_aprobada }}\",\n    \"comentario_curaduria\": \"{{ $json.comentario_curaduria }}\"\n  }\n}\n",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        1200,
-        1184
-      ],
-      "id": "2945a9a7-9cd5-4087-a375-7302d8e39aa5",
-      "name": "Webhook - Respuesta Rechazo"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "=\n{\n  \"success\": true,\n  \"mensaje\": \"El activo fue rechazado correctamente.\",\n  \"activo\": {\n    \"id_activo\": \"{{ $json.id_activo }}\",\n    \"id_lote\": \"{{ $json.id_lote }}\",\n    \"tipo_activo\": \"{{ $json.tipo_activo }}\",\n    \"estado_curaduria\": \"{{ $json.estado_curaduria }}\",\n    \"id_version_actual\": \"{{ $json.id_version_actual }}\",\n    \"id_version_aprobada\": \"{{ $json.id_version_aprobada }}\",\n    \"comentario_curaduria\": \"{{ $json.comentario_curaduria }}\"\n  }\n}\n",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        1216,
-        448
-      ],
-      "id": "62b8a801-fb85-4282-92e3-9f4224b217e7",
-      "name": "Webhook - Respuesta Aprobacion"
+      "id": "d9932281-c067-4cb9-a8d3-4cd5c0345f69",
+      "name": "DOC — Endpoint POST rechazar activo"
     }
   ],
   "pinData": {
@@ -426,18 +661,18 @@
       {
         "json": {
           "headers": {
-            "host": "pocket-costa-observed-ent.trycloudflare.com",
+            "host": "women-opera-attending-mirror.trycloudflare.com",
             "user-agent": "bruno-runtime/4.2.1",
-            "content-length": "162",
+            "content-length": "156",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip",
             "cdn-loop": "cloudflare; loops=1; subreqs=1",
             "cf-connecting-ip": "189.28.95.52",
             "cf-ew-via": "15",
             "cf-ipcountry": "BO",
-            "cf-ray": "a4a2a652babaa0fa-SCL",
+            "cf-ray": "a4affbd50827e99c-GIG",
             "cf-visitor": "{\"scheme\":\"https\"}",
-            "cf-warp-tag-id": "0e52a27e-dbf1-4534-958a-d176ae159650",
+            "cf-warp-tag-id": "97039785-76d4-4772-8689-40ee17694dac",
             "cf-worker": "trycloudflare.com",
             "connection": "keep-alive",
             "content-type": "application/json",
@@ -445,15 +680,15 @@
             "x-forwarded-proto": "https"
           },
           "params": {
-            "id_activo": "1"
+            "id_activo": "2"
           },
           "query": {},
           "body": {
             "contenido": {
-              "text": "Texto editado del post de LinkedIn."
+              "text": "Nuevo contenido para el Newletter3."
             },
-            "motivo_cambio": "Ajustes de redacción y tono",
-            "creado_por": "usuario_curador"
+            "motivo_cambio": "Ajustes de redacción",
+            "creado_por": "usuario_curador2"
           },
           "webhookUrl": "http://localhost:5678/webhook-test/1f7e9bc3-7b80-4d34-a007-98287179bd7f/communitylab/activos/:id_activo",
           "executionMode": "test"
@@ -467,18 +702,18 @@
       {
         "json": {
           "headers": {
-            "host": "pocket-costa-observed-ent.trycloudflare.com",
+            "host": "women-opera-attending-mirror.trycloudflare.com",
             "user-agent": "bruno-runtime/4.2.1",
-            "content-length": "99",
+            "content-length": "94",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip",
             "cdn-loop": "cloudflare; loops=1; subreqs=1",
             "cf-connecting-ip": "189.28.95.52",
             "cf-ew-via": "15",
             "cf-ipcountry": "BO",
-            "cf-ray": "a4a2ceb74f3907de-SCL",
+            "cf-ray": "a4affd2bbca89a2c-SCL",
             "cf-visitor": "{\"scheme\":\"https\"}",
-            "cf-warp-tag-id": "0e52a27e-dbf1-4534-958a-d176ae159650",
+            "cf-warp-tag-id": "97039785-76d4-4772-8689-40ee17694dac",
             "cf-worker": "trycloudflare.com",
             "connection": "keep-alive",
             "content-type": "application/json",
@@ -486,11 +721,11 @@
             "x-forwarded-proto": "https"
           },
           "params": {
-            "id_activo": "1"
+            "id_activo": "2"
           },
           "query": {},
           "body": {
-            "comentario_curaduria": "Contenido revisado y aprobado.",
+            "comentario_curaduria": "News revisado y aprobado.",
             "revisado_por": "usuario_curador"
           },
           "webhookUrl": "http://localhost:5678/webhook-test/69344a5d-8358-4fef-8918-f82ddfc7d829/communitylab/activos/:id_activo/aprobar",
@@ -501,63 +736,22 @@
         }
       }
     ],
-    "W5. PostgreSQL — Consultar Activo y Versión Actual2": [
-      {
-        "json": {
-          "id_activo": "1",
-          "id_lote": "1",
-          "tipo_activo": "LINKEDIN",
-          "contenido": {
-            "text": "Texto editado del post de LinkedIn."
-          },
-          "estado_curaduria": "borrador",
-          "id_version_actual": "2",
-          "numero_version": 2,
-          "origen_version": "usuario",
-          "contenido_version_actual": {
-            "text": "Texto editado del post de LinkedIn."
-          },
-          "id_version_aprobada": null
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ],
-    "W6. Aprobar Activo y Registrar Versión Aprobada": [
-      {
-        "json": {
-          "id_activo": "1",
-          "id_lote": "1",
-          "tipo_activo": "LINKEDIN",
-          "estado_curaduria": "aprobado",
-          "id_version_actual": "2",
-          "id_version_aprobada": "2",
-          "comentario_curaduria": "Contenido revisado y aprobado.",
-          "revisado_en": "2026-10-14T01:40:48.255Z",
-          "actualizado_en": "2026-10-14T01:40:48.255Z"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ],
     "Webhook - Rechazar activo": [
       {
         "json": {
           "headers": {
-            "host": "pocket-costa-observed-ent.trycloudflare.com",
+            "host": "women-opera-attending-mirror.trycloudflare.com",
             "user-agent": "bruno-runtime/4.2.1",
-            "content-length": "119",
+            "content-length": "88",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip",
             "cdn-loop": "cloudflare; loops=1; subreqs=1",
             "cf-connecting-ip": "189.28.95.52",
             "cf-ew-via": "15",
             "cf-ipcountry": "BO",
-            "cf-ray": "a4a2ee762c10cdce-GRU",
+            "cf-ray": "a4affdc74a2d3185-SCL",
             "cf-visitor": "{\"scheme\":\"https\"}",
-            "cf-warp-tag-id": "0e52a27e-dbf1-4534-958a-d176ae159650",
+            "cf-warp-tag-id": "97039785-76d4-4772-8689-40ee17694dac",
             "cf-worker": "trycloudflare.com",
             "connection": "keep-alive",
             "content-type": "application/json",
@@ -565,11 +759,11 @@
             "x-forwarded-proto": "https"
           },
           "params": {
-            "id_activo": "1"
+            "id_activo": "2"
           },
           "query": {},
           "body": {
-            "comentario_curaduria": "El contenido necesita ajustes antes de publicarse.",
+            "comentario_curaduria": "News fuera de tono.",
             "revisado_por": "usuario_curador"
           },
           "webhookUrl": "http://localhost:5678/webhook-test/f0d4835d-6e22-4a38-a508-272d557b5da1/communitylab/activos/:id_activo/rechazar",
@@ -579,141 +773,28 @@
           "item": 0
         }
       }
-    ],
-    "W6. Registrar Rechazo de Activo": [
-      {
-        "json": {
-          "id_activo": "1",
-          "id_lote": "1",
-          "tipo_activo": "LINKEDIN",
-          "estado_curaduria": "rechazado",
-          "id_version_actual": "2",
-          "id_version_aprobada": null,
-          "comentario_curaduria": "El contenido necesita ajustes antes de publicarse.",
-          "revisado_en": "2026-10-14T01:58:14.118Z",
-          "actualizado_en": "2026-10-14T01:58:14.118Z"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
     ]
   },
   "connections": {
-    "W1. Webhook — Editar Activo": {
+    "IF — Resultado rechazo": {
       "main": [
         [
           {
-            "node": "W2. Validar Solicitud de Edición",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W2. Validar Solicitud de Edición": {
-      "main": [
-        [
-          {
-            "node": "W3. IF — Solicitud Válida",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W3. IF — Solicitud Válida": {
-      "main": [
-        [
-          {
-            "node": "W5. PostgreSQL — Consultar Activo y Versión Actual",
+            "node": "Webhook - Respuesta Rechazo",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "W4. Responder Error de Validación",
+            "node": "Responder error rechazo",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "W5. PostgreSQL — Consultar Activo y Versión Actual": {
-      "main": [
-        [
-          {
-            "node": "W6.3. Crear Nueva Versión del Activo",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W6.3. Crear Nueva Versión del Activo": {
-      "main": [
-        [
-          {
-            "node": "W5. PostgreSQL — Consultar Activo y Versión Actual1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W3. IF — Solicitud Válida1": {
-      "main": [
-        [
-          {
-            "node": "W5. PostgreSQL — Consultar Activo y Versión Actual2",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "W4. Responder Error de Validación En Aprobacion",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W5. PostgreSQL — Consultar Activo y Versión Actual2": {
-      "main": [
-        [
-          {
-            "node": "W6. Aprobar Activo y Registrar Versión Aprobada",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W2. Validar Solicitud de Aprobacion": {
-      "main": [
-        [
-          {
-            "node": "W3. IF — Solicitud Válida1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook - Aprobar activo": {
-      "main": [
-        [
-          {
-            "node": "W2. Validar Solicitud de Aprobacion",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W6. Aprobar Activo y Registrar Versión Aprobada": {
+    "IF — Resultado aprobación": {
       "main": [
         [
           {
@@ -721,14 +802,61 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Responder error aprobación",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
-    "Webhook - Rechazar activo": {
+    "IF — Resultado edición": {
       "main": [
         [
           {
-            "node": "W2. Validar Solicitud de Rechazo",
+            "node": "W5. PostgreSQL — Consultar Activo y Versión Actual1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder error edición",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2. Validar Solicitud de Rechazo": {
+      "main": [
+        [
+          {
+            "node": "W3. IF — Solicitud Válida2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W6. Registrar Rechazo de Activo": {
+      "main": [
+        [
+          {
+            "node": "IF — Resultado rechazo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W5. PostgreSQL — Consultar Activo y Versión Actual4": {
+      "main": [
+        [
+          {
+            "node": "W6. Registrar Rechazo de Activo",
             "type": "main",
             "index": 0
           }
@@ -753,33 +881,146 @@
         ]
       ]
     },
-    "W5. PostgreSQL — Consultar Activo y Versión Actual4": {
+    "W6. Aprobar Activo y Registrar Versión Aprobada": {
       "main": [
         [
           {
-            "node": "W6. Registrar Rechazo de Activo",
+            "node": "IF — Resultado aprobación",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "W6. Registrar Rechazo de Activo": {
+    "W2. Validar Solicitud de Aprobacion": {
       "main": [
         [
           {
-            "node": "Webhook - Respuesta Rechazo",
+            "node": "W3. IF — Solicitud Válida1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "W2. Validar Solicitud de Rechazo": {
+    "W5. PostgreSQL — Consultar Activo y Versión Actual2": {
       "main": [
         [
           {
-            "node": "W3. IF — Solicitud Válida2",
+            "node": "W6. Aprobar Activo y Registrar Versión Aprobada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W3. IF — Solicitud Válida1": {
+      "main": [
+        [
+          {
+            "node": "W5. PostgreSQL — Consultar Activo y Versión Actual2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W4. Responder Error de Validación En Aprobacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W5. PostgreSQL — Consultar Activo y Versión Actual1": {
+      "main": [
+        [
+          {
+            "node": "Responder éxito edición",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W6.3. Crear Nueva Versión del Activo": {
+      "main": [
+        [
+          {
+            "node": "IF — Resultado edición",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W5. PostgreSQL — Consultar Activo y Versión Actual": {
+      "main": [
+        [
+          {
+            "node": "W6.3. Crear Nueva Versión del Activo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W3. IF — Solicitud Válida": {
+      "main": [
+        [
+          {
+            "node": "W5. PostgreSQL — Consultar Activo y Versión Actual",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W4. Responder Error de Validación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2. Validar Solicitud de Edición": {
+      "main": [
+        [
+          {
+            "node": "W3. IF — Solicitud Válida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W1. Webhook — Editar Activo": {
+      "main": [
+        [
+          {
+            "node": "W2. Validar Solicitud de Edición",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Aprobar activo": {
+      "main": [
+        [
+          {
+            "node": "W2. Validar Solicitud de Aprobacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Rechazar activo": {
+      "main": [
+        [
+          {
+            "node": "W2. Validar Solicitud de Rechazo",
             "type": "main",
             "index": 0
           }
@@ -792,12 +1033,11 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "2e806f5d-0967-4d82-9a23-5d608d991936",
+  "versionId": "cc7d49c0-ae5c-4389-a648-b2379fad9a53",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
   },
   "nodeGroups": [],
-  "id": "n6q8JBjTm2HfwKhD",
+  "id": "v6VM2t1rUZYJTOts",
   "tags": []
 }
