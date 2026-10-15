@@ -1,0 +1,935 @@
+{
+  "name": "Generador Newsletter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "communitylab/generar-newsletter",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -192
+      ],
+      "id": "9b2e3796-d9fc-4434-a173-c92b5752e19c",
+      "name": "Webhook - Generacion de Newsletter",
+      "webhookId": "6aafe9b2-ea4b-4be2-9da2-35f525fb015d"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body ?? input;\nconst errores = [];\n\n// 1. Validar origen_comunidad\nconst origen = String(body.origen_comunidad ?? \"\").trim();\nif (!origen) {\n  errores.push(\"El campo 'origen_comunidad' es obligatorio y no puede estar vacío.\");\n}\n\n// 2. Validar existencia de fechas\nconst desde = body.ventana_desde;\nconst hasta = body.ventana_hasta;\n\nif (!desde) {\n  errores.push(\"El campo 'ventana_desde' es obligatorio.\");\n}\nif (!hasta) {\n  errores.push(\"El campo 'ventana_hasta' es obligatorio.\");\n}\n\nlet fechaDesde = null;\nlet fechaHasta = null;\n\n// 3. Validar formato y lógica de fechas\nif (desde) {\n  fechaDesde = new Date(desde);\n  if (Number.isNaN(fechaDesde.getTime())) {\n    errores.push(\"El formato de 'ventana_desde' no es una fecha válida.\");\n  }\n}\n\nif (hasta) {\n  fechaHasta = new Date(hasta);\n  if (Number.isNaN(fechaHasta.getTime())) {\n    errores.push(\"El formato de 'ventana_hasta' no es una fecha válida.\");\n  }\n}\n\nif (fechaDesde && fechaHasta && !Number.isNaN(fechaDesde.getTime()) && !Number.isNaN(fechaHasta.getTime())) {\n  if (fechaDesde >= fechaHasta) {\n    errores.push(\"El período de fechas no es válido: 'ventana_desde' debe ser estrictamente menor que 'ventana_hasta'.\");\n  }\n}\n\n// 4. Procesar opciones con valores por defecto\nconst opciones = body.opciones ?? {};\nconst opcionesNormalizadas = {\n  idioma: opciones.idioma ?? \"es\",\n  tono: opciones.tono ?? \"inspirador\",\n  min_actividades_utiles: Math.max(1, Number(opciones.min_actividades_utiles ?? 3)),\n  max_actividades: Math.min(100, Math.max(1, Number(opciones.max_actividades ?? 30)))\n};\n\nconst esValido = errores.length === 0;\n\n// 5. Retornar resultado estructurado para el flujo de n8n\nreturn [{\n  json: {\n    es_valido: esValido,\n    errores: errores,\n    datos_validados: esValido ? {\n      origen_comunidad: origen,\n      ventana_desde: fechaDesde.toISOString(),\n      ventana_hasta: fechaHasta.toISOString(),\n      opciones: opcionesNormalizadas,\n      // Clave canónica: mismos datos efectivos => misma solicitud.\n      // Se usa la fuente tal como se valida contra fuente.nombre en PostgreSQL.\n      clave_idempotencia: 'newsletter:v1:' + JSON.stringify({\n        origen_comunidad: origen,\n        ventana_desde: fechaDesde.toISOString(),\n        ventana_hasta: fechaHasta.toISOString(),\n        opciones: opcionesNormalizadas\n      })\n    } : null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -192
+      ],
+      "id": "8724b2e7-f65e-4f84-8c78-cf610be2f472",
+      "name": "W2 — Validar solicitud"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "08891db4-4552-4503-a2d7-0127e107e3f2",
+              "leftValue": "={{ $json.es_valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        -192
+      ],
+      "id": "69fa243c-a526-4743-a92f-458bd16dd022",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"exito\",\n  newsletter_generado: true,\n  idempotente: false,\n  newsletter: {\n    id_activo: $json.id_activo,\n    id_lote: $json.id_lote,\n    tipo_activo: $json.tipo_activo,\n    estado_curaduria: $json.estado_curaduria,\n    id_version_actual: $json.id_version_actual,\n    numero_version: $json.numero_version,\n    estado_lote: $json.estado_lote,\n    contenido: $json.contenido\n  },\n  meta: {\n    origen_comunidad: $json.origen_comunidad,\n    ventana_desde: $json.ventana_desde,\n    ventana_hasta: $json.ventana_hasta\n  }\n} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3312,
+        -432
+      ],
+      "id": "27e7b570-9daf-413e-99ba-ddbd11dcac5d",
+      "name": "Respuesta 200"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"error\",\n  mensaje: \"Se encontraron errores de validación en la petición.\",\n  errores: $json.errores\n} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        -96
+      ],
+      "id": "48648bb7-83cd-440b-98f1-88399f5674f4",
+      "name": "Respuesta 400 (Bad Request)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH actividades_filtradas AS (\n    SELECT\n        a.id_actividad,\n        a.id_lote AS id_lote_origen,\n        a.contenido AS texto_original,\n        a.tipo_declarado,\n        a.identificador_origen,\n        a.momento_origen,\n        a.creado_en,\n        f.nombre AS origen_comunidad,\n        c.nombre AS canal,\n        au.nombre AS autor,\n        an.sentimiento,\n        an.relevancia,\n        an.tipo_insight,\n        an.temas,\n        an.resumen,\n        an.evidencia_clave\n\n    FROM actividad a\n\n    JOIN fuente f\n        ON f.id_fuente = a.id_fuente\n\n    JOIN canal c\n        ON c.id_canal = a.id_canal\n\n    JOIN analisis an\n        ON an.id_actividad = a.id_actividad\n\n    LEFT JOIN autor au\n        ON au.id_autor = a.id_autor\n\n    WHERE a.estado_procesamiento = 'analizada'\n      AND COALESCE(a.momento_origen, a.creado_en) >= $1::timestamptz\n      AND COALESCE(a.momento_origen, a.creado_en) <  $2::timestamptz\n),\nactividades_limitadas AS (\n    SELECT *\n    FROM actividades_filtradas\n    ORDER BY\n        CASE LOWER(COALESCE(relevancia, ''))\n            WHEN 'alta' THEN 3\n            WHEN 'media' THEN 2\n            WHEN 'baja' THEN 1\n            ELSE 0\n        END DESC,\n        COALESCE(momento_origen, creado_en) DESC,\n        id_actividad DESC\n    LIMIT $4::integer\n)\nSELECT\n    COUNT(*) AS total_actividades,\n    COALESCE(\n        JSONB_AGG(\n            JSONB_BUILD_OBJECT(\n                'id_actividad', id_actividad,\n                'id_lote_origen', id_lote_origen,\n                'texto_original', texto_original,\n                'tipo_declarado', tipo_declarado,\n                'momento_origen', momento_origen,\n                'creado_en', creado_en,\n                'origen_comunidad', origen_comunidad,\n                'canal', canal,\n                'autor', autor,\n                'analisis', JSONB_BUILD_OBJECT(\n                    'sentimiento', sentimiento,\n                    'relevancia', relevancia,\n                    'tipo_insight', tipo_insight,\n                    'temas', temas,\n                    'resumen', resumen,\n                    'evidencia_clave', evidencia_clave\n                )\n            )\n            ORDER BY\n                COALESCE(momento_origen, creado_en) ASC,\n                id_actividad ASC\n        ),\n        '[]'::jsonb\n    ) AS actividades\nFROM actividades_limitadas;",
+        "options": {
+          "queryReplacement": "={{ $('W2 — Validar solicitud').item.json.datos_validados.ventana_desde }}, {{ $('W2 — Validar solicitud').item.json.datos_validados.ventana_hasta }}, {{ $('W2 — Validar solicitud').item.json.datos_validados.origen_comunidad }}, {{ $('W2 — Validar solicitud').item.json.datos_validados.opciones.max_actividades }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        -288
+      ],
+      "id": "5b4dd652-000f-4172-b76c-3e4fed915523",
+      "name": "W3 — Consultar actividades analizadas",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\nconst request = $('W2 — Validar solicitud').first().json.datos_validados;\n\nconst actividades = Array.isArray(row.actividades)\n  ? row.actividades\n  : typeof row.actividades === \"string\"\n    ? JSON.parse(row.actividades)\n    : [];\n\nconst utiles = actividades.filter((a) => {\n  const texto = String(\n    a.analisis?.evidencia_clave ||\n    a.analisis?.resumen ||\n    a.texto_original ||\n    \"\"\n  ).trim();\n\n  return texto.length >= 30;\n});\n\nconst minimo =\n  request.opciones.min_actividades_utiles;\n\nif (utiles.length < minimo) {\n  return [{\n    json: {\n      status: \"sin_contenido_suficiente\",\n      newsletter_generado: false,\n      activo_persistido: false,\n      mensaje: \"No hay suficiente contenido útil para generar el newsletter.\",\n      meta: {\n        origen_comunidad: request.origen_comunidad,\n        ventana_desde: request.ventana_desde,\n        ventana_hasta: request.ventana_hasta,\n        actividades_recuperadas: actividades.length,\n        actividades_utiles: utiles.length,\n        minimo_requerido: minimo\n      }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    status: \"listo_para_generar\",\n    origen_comunidad: request.origen_comunidad,\n    ventana_desde: request.ventana_desde,\n    ventana_hasta: request.ventana_hasta,\n    opciones: request.opciones,\n    actividades_utiles: utiles\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -288
+      ],
+      "id": "f15343ab-f2c7-4b27-bd5c-f74de111b101",
+      "name": "W4 — Evaluar suficiencia y preparar evidencias"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "68c2ab39-821f-4d49-aab7-b21b11bec5fa",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "=listo_para_generar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        -288
+      ],
+      "id": "037de568-59a7-4b4d-8e77-820203cb8e9e",
+      "name": "W4.1 — ¿Contenido suficiente?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"sin_contenido_suficiente\",\n  newsletter_generado: false,\n  activo_persistido: false,\n  mensaje: $('W4 — Evaluar suficiencia y preparar evidencias').first().json.mensaje,\n  meta: $('W4 — Evaluar suficiencia y preparar evidencias').first().json.meta,\n  id_lote: $('W2.2 — Reservar lote editorial').first().json.id_lote\n} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1408,
+        -144
+      ],
+      "id": "cc959260-9ec0-41d7-9ff3-7753df73b962",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "model": "openrouter/free",
+        "options": {
+          "temperature": 0.6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        -320
+      ],
+      "id": "e6f97bce-7408-4c90-b611-afee23ed4969",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "LggebCc9i8in5Mr3",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Genera el newsletter con estas condiciones:\n\nComunidad: {{ $json.origen_comunidad }}\nPeríodo desde: {{ $json.ventana_desde }}\nPeríodo hasta: {{ $json.ventana_hasta }}\nIdioma: {{ $json.opciones.idioma }}\nTono: {{ $json.opciones.tono }}\n\nUtiliza las siguientes actividades analizadas como fuente de evidencia:\n\n{{ JSON.stringify($json.actividades_utiles) }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Eres el editor del newsletter semanal de CommunityLab.\n\nTu tarea es redactar un newsletter útil, fiel a las evidencias y\nbasado exclusivamente en las actividades analizadas que recibes.\n\nReglas:\n1. No inventes eventos, nombres, logros, cifras ni citas.\n2. No conviertas preguntas o hipótesis en hechos confirmados.\n3. Agrupa las evidencias por temas cuando sea pertinente.\n4. Conserva el sentido de las experiencias y las dudas originales.\n5. No repitas una misma idea en varias secciones.\n6. Utiliza el idioma y tono solicitados.\n7. No incluyas datos personales innecesarios.\n8. Si las evidencias no permiten construir un newsletter coherente,\n   devuelve status=\"insuficiente\" y explica brevemente el motivo.\n9. Devuelve únicamente JSON válido, sin Markdown ni texto adicional.\n\nFormato de salida:\n{\n  \"status\": \"generado\" | \"insuficiente\",\n  \"titulo\": \"string\",\n  \"introduccion\": \"string\",\n  \"secciones\": [\n    {\n      \"titulo\": \"string\",\n      \"contenido\": \"string\",\n      \"ids_actividades\": [1, 2]\n    }\n  ],\n  \"cierre\": \"string\"\n}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1344,
+        -544
+      ],
+      "id": "88bfbb9a-1807-468a-a5ec-2415ea9cc47a",
+      "name": "W5. Generador Newsletter"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst contexto = $('W4 — Evaluar suficiencia y preparar evidencias').first().json;\nconst newsletter = $('W6 — Normalizar newsletter').first().json;\n\nif (newsletter.status !== 'generado') {\n  throw new Error('La newsletter no está lista para persistir.');\n}\n\nconst actividades = contexto.actividades_utiles ?? [];\n\nif (!Array.isArray(actividades) || actividades.length === 0) {\n  throw new Error('No hay actividades originales para validar.');\n}\n\n// Construimos el conjunto de IDs disponibles en la entrada.\nconst idsDisponibles = new Set(\n  actividades.map(a => Number(a.id_actividad))\n);\n\nconst idsUsados = (newsletter.secciones ?? [])\n  .flatMap(seccion => seccion.ids_actividades ?? [])\n  .map(Number);\n\nconst idsInvalidos = [...new Set(idsUsados)]\n  .filter(id => !Number.isInteger(id) || !idsDisponibles.has(id));\n\nif (idsInvalidos.length > 0) {\n  throw new Error(\n    `La newsletter contiene IDs de actividades que no pertenecen a la entrada: ${idsInvalidos.join(', ')}`\n  );\n}\n\n// Detectamos posibles diferencias entre la fuente solicitada\n// y la fuente declarada en las actividades.\nconst fuentesDetectadas = [\n  ...new Set(\n    actividades\n      .map(a => a.origen_comunidad)\n      .filter(Boolean)\n  )\n];\n\n\nreturn [{\n  json: {\n    origen_comunidad: contexto.origen_comunidad,\n    ventana_desde: contexto.ventana_desde,\n    ventana_hasta: contexto.ventana_hasta,\n    opciones: contexto.opciones,\n    total_actividades_utiles: actividades.length,\n    ids_actividades_referenciadas: [...new Set(idsUsados)],\n    newsletter: {\n      status: newsletter.status,\n      titulo: newsletter.titulo,\n      introduccion: newsletter.introduccion,\n      secciones: newsletter.secciones,\n      cierre: newsletter.cierre,\n      contenido_completo: newsletter.contenido_completo\n    },\n    actividades_utiles: actividades\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -432
+      ],
+      "id": "650eb8ef-c2f8-4d74-a68c-fec4bc7ba81e",
+      "name": "W7 — Validar referencias y preparar persistencia"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $input.first().json;\n\n// El resultado puede llegar como JSON serializado en \"text\"\n// o como un objeto JSON directamente.\nlet newsletter = input.text ?? input.output ?? input;\n\nif (typeof newsletter === \"string\") {\n  newsletter = newsletter\n    .replace(/^```json\\s*/i, \"\")\n    .replace(/^```\\s*/i, \"\")\n    .replace(/\\s*```$/, \"\")\n    .trim();\n\n  try {\n    newsletter = JSON.parse(newsletter);\n  } catch (error) {\n    throw new Error(\n      `El generador no devolvió un JSON válido: ${error.message}`\n    );\n  }\n}\n\nif (\n  !newsletter ||\n  typeof newsletter !== \"object\" ||\n  Array.isArray(newsletter)\n) {\n  throw new Error(\"La salida del generador debe ser un objeto JSON.\");\n}\n\nif (newsletter.status !== \"generado\") {\n  throw new Error(\n    `La newsletter no está lista para persistir. Estado: ${\n      newsletter.status ?? \"no especificado\"\n    }`\n  );\n}\n\nif (\n  typeof newsletter.titulo !== \"string\" ||\n  !newsletter.titulo.trim()\n) {\n  throw new Error(\"La newsletter no contiene un título válido.\");\n}\n\nif (!Array.isArray(newsletter.secciones)) {\n  throw new Error(\"La newsletter debe contener un array de secciones.\");\n}\n\nfor (const [index, seccion] of newsletter.secciones.entries()) {\n  if (\n    typeof seccion.titulo !== \"string\" ||\n    !seccion.titulo.trim() ||\n    typeof seccion.contenido !== \"string\" ||\n    !seccion.contenido.trim()\n  ) {\n    throw new Error(\n      `La sección ${index + 1} no tiene título o contenido válido.`\n    );\n  }\n\n  if (\n    seccion.ids_actividades !== undefined &&\n    (\n      !Array.isArray(seccion.ids_actividades) ||\n      !seccion.ids_actividades.every(\n        id => Number.isInteger(Number(id)) && Number(id) > 0\n      )\n    )\n  ) {\n    throw new Error(\n      `Las referencias de actividades de la sección ${index + 1} no son válidas.`\n    );\n  }\n}\n\nreturn [{\n  json: {\n    status: newsletter.status,\n    titulo: newsletter.titulo.trim(),\n    introduccion: newsletter.introduccion ?? \"\",\n    secciones: newsletter.secciones,\n    cierre: newsletter.cierre ?? \"\",\n    contenido_completo: [\n      newsletter.titulo,\n      newsletter.introduccion,\n      ...newsletter.secciones.map(\n        s => `${s.titulo}\\n${s.contenido}`\n      ),\n      newsletter.cierre\n    ].filter(Boolean).join(\"\\n\\n\"),\n    newsletter\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        -432
+      ],
+      "id": "d5a9cebb-3d23-4781-8c18-db0b2fdf469b",
+      "name": "W6 — Normalizar newsletter"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE lote_procesamiento\nSET\n    estado = 'procesando',\n    opciones = $2::jsonb,\n    total_interacciones = $3::integer,\n    workflow_execution_id = $4::text,\n    actualizado_en = NOW(),\n    error_resumen = NULL,\n    finalizado_en = NULL\nWHERE id_lote = $1::bigint\n  AND tipo_operacion = 'newsletter'\n  AND estado = 'procesando'\nRETURNING\n    id_lote,\n    id_fuente,\n    periodo_referencia,\n    estado,\n    ventana_desde,\n    ventana_hasta;",
+        "options": {
+          "queryReplacement": "={{ [\n  $('W2.2 — Reservar lote editorial').first().json.id_lote,\n  JSON.stringify($('W7 — Validar referencias y preparar persistencia').first().json.opciones),\n  $('W7 — Validar referencias y preparar persistencia').first().json.total_actividades_utiles,\n  String($execution.id)\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2144,
+        -432
+      ],
+      "id": "ba03c4b3-aa96-43d7-b551-d2e4d7aadfd2",
+      "name": "W8 — Crear lote editorial",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO activo_generado (\n    id_lote,\n    tipo_activo,\n    contenido,\n    estado_curaduria\n)\nVALUES (\n    $1::bigint,\n    'NEWSLETTER',\n    $2::jsonb,\n    'borrador'\n)\nRETURNING\n    id_activo,\n    id_lote,\n    tipo_activo,\n    estado_curaduria;",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.id_lote,\n  JSON.stringify($('W7 — Validar referencias y preparar persistencia').first().json.newsletter)\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2416,
+        -432
+      ],
+      "id": "ee5e62be-bd1a-4824-831b-d5776aa14625",
+      "name": "W9 — Guardar activo NEWSLETTER",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH nueva_version AS (\n    INSERT INTO version_activo (\n        id_activo,\n        numero_version,\n        contenido,\n        origen_version,\n        motivo_cambio,\n        creado_por\n    )\n    VALUES (\n        $1::bigint,\n        1,\n        $2::jsonb,\n        'ia',\n        'Generación inicial de newsletter',\n        'CommunityLab n8n'\n    )\n    RETURNING\n        id_version,\n        id_activo,\n        numero_version\n)\nSELECT\n    v.id_version,\n    v.id_activo,\n    v.numero_version,\n    a.id_lote\nFROM nueva_version v\nJOIN activo_generado a\n    ON a.id_activo = v.id_activo;",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.id_activo,\n  JSON.stringify($('W7 — Validar referencias y preparar persistencia').first().json.newsletter)\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2640,
+        -432
+      ],
+      "id": "a908e77f-64b4-4c53-848a-160bb57dec58",
+      "name": "W10 — Crear versión inicial",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH activo_vinculado AS (\n    UPDATE activo_generado\n    SET id_version_actual = $1::bigint\n    WHERE id_activo = $2::bigint\n    RETURNING\n        id_activo,\n        id_lote,\n        id_version_actual,\n        tipo_activo,\n        estado_curaduria\n),\nlote_finalizado AS (\n    UPDATE lote_procesamiento l\n    SET\n        estado = 'completado',\n        finalizado_en = NOW()\n    FROM activo_vinculado a\n    WHERE l.id_lote = a.id_lote\n    RETURNING\n        l.id_lote,\n        l.estado\n)\nSELECT\n    l.id_lote,\n    a.id_activo,\n    a.id_version_actual AS id_version,\n    a.tipo_activo,\n    a.estado_curaduria,\n    l.estado AS estado_lote\nFROM lote_finalizado l\nJOIN activo_vinculado a\n    ON a.id_lote = l.id_lote;",
+        "options": {
+          "queryReplacement": "={{ $json.id_version }}, {{ $json.id_activo }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        2864,
+        -432
+      ],
+      "id": "d4948555-7613-4778-b55e-5a5b991d7eb2",
+      "name": "W11 — Vincular versión actual",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    a.id_activo,\n    a.id_lote,\n    a.tipo_activo,\n    a.estado_curaduria,\n    v.id_version AS id_version_actual,\n    v.numero_version,\n    v.contenido AS contenido,\n    l.estado AS estado_lote,\n    l.ventana_desde,\n    l.ventana_hasta,\n    f.nombre AS origen_comunidad\nFROM activo_generado a\nJOIN version_activo v\n    ON v.id_version = a.id_version_actual\n   AND v.id_activo = a.id_activo\nJOIN lote_procesamiento l\n    ON l.id_lote = a.id_lote\nJOIN fuente f\n    ON f.id_fuente = l.id_fuente\nWHERE a.id_activo = $1::bigint\n  AND v.id_version = $2::bigint\n  AND l.id_lote = $3::bigint\n  AND a.tipo_activo = 'NEWSLETTER';",
+        "options": {
+          "queryReplacement": "={{ [$json.id_activo, $json.id_version, $json.id_lote] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        3088,
+        -432
+      ],
+      "id": "8c9b7a64-4b2d-4c2e-8d6a-2f21d7b9a301",
+      "name": "W12 — Recuperar newsletter persistido",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH fuente_obj AS (\n    SELECT id_fuente\n    FROM fuente\n    WHERE nombre = $1\n),\nreserva AS (\n    INSERT INTO lote_procesamiento (\n        id_fuente,\n        periodo_referencia,\n        estado,\n        opciones,\n        workflow_execution_id,\n        ventana_desde,\n        ventana_hasta,\n        tipo_operacion,\n        clave_idempotencia\n    )\n    SELECT\n        f.id_fuente,\n        'newsletter_' ||\n            to_char($2::timestamptz, 'YYYY-MM-DD') || '_' ||\n            to_char($3::timestamptz, 'YYYY-MM-DD'),\n        'procesando',\n        $4::jsonb,\n        $5::text,\n        $2::timestamptz,\n        $3::timestamptz,\n        'newsletter',\n        $6::text\n    FROM fuente_obj f\n    ON CONFLICT (clave_idempotencia)\n        WHERE tipo_operacion = 'newsletter'\n          AND clave_idempotencia IS NOT NULL\n    DO UPDATE SET actualizado_en = NOW()\n    RETURNING\n        id_lote,\n        id_fuente,\n        periodo_referencia,\n        estado,\n        ventana_desde,\n        ventana_hasta,\n        clave_idempotencia,\n        (xmax = 0) AS fue_creado\n),\ndatos AS (\n    SELECT\n        r.id_lote,\n        r.id_fuente,\n        r.periodo_referencia,\n        r.estado,\n        r.ventana_desde,\n        r.ventana_hasta,\n        r.clave_idempotencia,\n        r.fue_creado,\n        ag.id_activo,\n        ag.tipo_activo,\n        ag.estado_curaduria,\n        ag.id_version_actual,\n        ag.contenido AS newsletter\n    FROM reserva r\n    LEFT JOIN activo_generado ag\n        ON ag.id_lote = r.id_lote\n       AND ag.tipo_activo = 'NEWSLETTER'\n)\nSELECT\n    d.*,\n    CASE\n        WHEN d.fue_creado THEN 'reservado'\n        WHEN d.estado = 'completado'\n             AND d.id_activo IS NOT NULL\n             AND d.id_version_actual IS NOT NULL THEN 'completado'\n        WHEN d.estado IN ('recibido', 'procesando') THEN 'en_proceso'\n        ELSE 'requiere_revision'\n    END AS resultado_reserva\nFROM datos d;",
+        "options": {
+          "queryReplacement": "={{ [\n  $('W2 — Validar solicitud').first().json.datos_validados.origen_comunidad,\n  $('W2 — Validar solicitud').first().json.datos_validados.ventana_desde,\n  $('W2 — Validar solicitud').first().json.datos_validados.ventana_hasta,\n  JSON.stringify($('W2 — Validar solicitud').first().json.datos_validados.opciones),\n  String($execution.id),\n  $('W2 — Validar solicitud').first().json.datos_validados.clave_idempotencia\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        -480
+      ],
+      "id": "eff2aeb2-a1b8-466a-aa4f-92f47f03f5a6",
+      "name": "W2.2 — Reservar lote editorial",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9232c39a-2c0c-44cb-b5f7-31f5457fe7a1",
+              "leftValue": "={{ $json.resultado_reserva }}",
+              "rightValue": "reservado",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        -480
+      ],
+      "id": "d59ec9ed-97b4-40d3-bbbe-dddffad7ecd2",
+      "name": "W2.3 — ¿Reserva nueva?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8ee7e87d-9dc0-4384-980d-0dcba58b2b9f",
+              "leftValue": "={{ $json.resultado_reserva }}",
+              "rightValue": "completado",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        -576
+      ],
+      "id": "f255fbf5-8ef3-4649-9854-009135f1f0a2",
+      "name": "W2.4 — ¿Newsletter ya completado?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a5513ca4-d3d5-4d96-8ad9-ecded846dcd9",
+              "leftValue": "={{ $json.resultado_reserva }}",
+              "rightValue": "en_proceso",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        -576
+      ],
+      "id": "52688403-3754-45f6-a3e3-3aa6e4f866d2",
+      "name": "W2.5 — ¿Solicitud en proceso?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"exito\",\n  newsletter_generado: true,\n  idempotente: true,\n  mensaje: \"La solicitud ya estaba completada; se devuelve el newsletter persistido sin volver a llamar a la IA.\",\n  newsletter: {\n    id_activo: $json.id_activo,\n    id_lote: $json.id_lote,\n    tipo_activo: $json.tipo_activo,\n    estado_curaduria: $json.estado_curaduria,\n    id_version_actual: $json.id_version_actual,\n    contenido: $json.newsletter\n  },\n  meta: {\n    ventana_desde: $json.ventana_desde,\n    ventana_hasta: $json.ventana_hasta,\n    clave_idempotencia: $json.clave_idempotencia\n  }\n} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        -720
+      ],
+      "id": "4d475e25-8cb7-4747-acc7-5605b27f4be1",
+      "name": "Respuesta 200 — Newsletter idempotente"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"en_proceso\",\n  newsletter_generado: false,\n  mensaje: \"Ya existe una solicitud equivalente en proceso. No se inició una segunda generación.\",\n  id_lote: $json.id_lote,\n  meta: {\n    ventana_desde: $json.ventana_desde,\n    ventana_hasta: $json.ventana_hasta\n  }\n} }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        -528
+      ],
+      "id": "006dbe06-ea4c-4934-ad13-f7ba4cfdc4dc",
+      "name": "Respuesta 202 — Solicitud en proceso"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"requiere_revision\",\n  newsletter_generado: false,\n  mensaje: \"Existe una solicitud equivalente que no está completada. No se generó otra copia automáticamente; revisa el lote antes de reintentar.\",\n  id_lote: $json.id_lote,\n  estado_lote: $json.estado,\n  resultado_reserva: $json.resultado_reserva\n} }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        -336
+      ],
+      "id": "cfe3db94-da5e-4a67-b942-a0fa7bd79a92",
+      "name": "Respuesta 409 — Solicitud requiere revisión"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE lote_procesamiento\nSET\n    estado = 'parcial',\n    total_interacciones = $2::integer,\n    error_resumen = $3::text,\n    actualizado_en = NOW(),\n    finalizado_en = NOW()\nWHERE id_lote = $1::bigint\n  AND tipo_operacion = 'newsletter'\n  AND estado = 'procesando'\nRETURNING id_lote, estado, total_interacciones, error_resumen;",
+        "options": {
+          "queryReplacement": "={{ [\n  $('W2.2 — Reservar lote editorial').first().json.id_lote,\n  $json.meta.actividades_recuperadas,\n  $json.mensaje\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1408,
+        48
+      ],
+      "id": "c2981f0b-9faa-491d-b5ff-8261cb027e89",
+      "name": "W4.2 — Marcar lote sin contenido suficiente",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook - Generacion de Newsletter": [
+      {
+        "json": {
+          "headers": {
+            "host": "pocket-costa-observed-ent.trycloudflare.com",
+            "user-agent": "bruno-runtime/4.2.1",
+            "content-length": "261",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "189.28.95.52",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "BO",
+            "cf-ray": "a4a3c7c13d6fe797-SCL",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "0e52a27e-dbf1-4534-958a-d176ae159650",
+            "cf-worker": "trycloudflare.com",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "x-forwarded-for": "189.28.95.52",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "origen_comunidad": "Discord_Grupo_ONE_G10",
+            "ventana_desde": "2026-10-07T00:00:00Z",
+            "ventana_hasta": "2026-10-14T00:00:00Z",
+            "opciones": {
+              "idioma": "es",
+              "tono": "inspirador",
+              "min_actividades_utiles": 3,
+              "max_actividades": 30
+            }
+          },
+          "webhookUrl": "http://localhost:5678/webhook-test/communitylab/generar-newsletter",
+          "executionMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "W5. Generador Newsletter": [
+      {
+        "json": {
+          "text": "{\n  \"status\": \"generado\",\n  \"titulo\": \"CommunityLab: Una semana de aprendizaje, dudas y logros\",\n  \"introduccion\": \"Esta semana ha sido un claro ejemplo de cómo la colaboración y el intercambio de ideas impulsan el crecimiento de nuestra comunidad. Nuevos miembros, dudas técnicas, logros personales y sugerencias de mejora se han entrelazado para generar un ambiente de aprendizaje constante.\",\n  \"secciones\": [\n    {\n      \"titulo\": \"Bienvenida y primeros pasos\",\n      \"contenido\": \"Ana Martínez ha dado la bienvenida al grupo y ha compartido su entusiasmo por comenzar su viaje en OCI y LangGraph, invitando a la comunidad a ofrecerle consejos y recursos.\",\n      \"ids_actividades\": [1]\n    },\n    {\n      \"titulo\": \"Dudas técnicas y consejos\",\n      \"contenido\": \"Varios miembros han planteado interrogantes relevantes: Carlos Ruiz indaga sobre el aumento de latencia en agentes con memoria después de diez interacciones; Sofía Pérez busca ejemplos prácticos para distinguir entre StateGraph y MessageGraph; Carlos Ruiz también pregunta si es necesario configurar un reducer explícito al pasar resultados de herramientas; Martín López recomienda versionar el esquema del estado al usar checkpointing con Postgres para evitar problemas de compatibilidad; Ana Martínez consulta sobre la viabilidad de desplegar un agente en OCI Functions frente a Compute, preocupada por costos y cold start; Diego Fernández reporta un timeout al subir archivos grandes a Object Storage con Python 3.12.\",\n      \"ids_actividades\": [2,5,6,7,8,9]\n    },\n    {\n      \"titulo\": \"Logros y oportunidades\",\n      \"contenido\": \"Laura Gómez ha compartido su logro de obtener su primera entrevista técnica aplicando conceptos de LangGraph, demostrando el impacto del curso. Además, Diego Fernández ha compartido una oportunidad laboral remoto para perfiles mid-level con experiencia en Python y orquestación de agentes.\",\n      \"ids_actividades\": [3,4]\n    },\n    {\n      \"titulo\": \"Feedback y sugerencias\",\n      \"contenido\": \"Laura Gómez ha calificado el módulo de prompt engineering como excelente y sugiere incluir más ejemplos de few-shot con esquemas JSON. Por su parte, Sofía Pérez propone un laboratorio práctico para evaluar la fidelidad y precisión de herramientas. Martín López comparte su testimonio de haber completado el track de LangGraph y desarrollado un flujo de onboarding con human-in-the-loop.\",\n      \"ids_actividades\": [10,11,12]\n    }\n  ],\n  \"cierre\": \"Seguimos construyendo conocimiento juntos. ¡Que esta semana de aprendizaje inspire a seguir adelante!\"\n}"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "W9 — Guardar activo NEWSLETTER": [
+      {
+        "json": {
+          "id_activo": "3",
+          "id_lote": "3",
+          "tipo_activo": "NEWSLETTER",
+          "estado_curaduria": "borrador"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "W10 — Crear versión inicial": [
+      {
+        "json": {
+          "id_version": "4",
+          "id_activo": "3",
+          "numero_version": 1,
+          "id_lote": "3"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "W11 — Vincular versión actual": [
+      {
+        "json": {
+          "id_lote": "3",
+          "id_activo": "3",
+          "id_version": "4",
+          "tipo_activo": "NEWSLETTER",
+          "estado_curaduria": "borrador",
+          "estado_lote": "completado"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook - Generacion de Newsletter": {
+      "main": [
+        [
+          {
+            "node": "W2 — Validar solicitud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2 — Validar solicitud": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "W2.2 — Reservar lote editorial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta 400 (Bad Request)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W3 — Consultar actividades analizadas": {
+      "main": [
+        [
+          {
+            "node": "W4 — Evaluar suficiencia y preparar evidencias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W4 — Evaluar suficiencia y preparar evidencias": {
+      "main": [
+        [
+          {
+            "node": "W4.1 — ¿Contenido suficiente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W4.1 — ¿Contenido suficiente?": {
+      "main": [
+        [
+          {
+            "node": "W5. Generador Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W4.2 — Marcar lote sin contenido suficiente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "W5. Generador Newsletter",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W5. Generador Newsletter": {
+      "main": [
+        [
+          {
+            "node": "W6 — Normalizar newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W6 — Normalizar newsletter": {
+      "main": [
+        [
+          {
+            "node": "W7 — Validar referencias y preparar persistencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W7 — Validar referencias y preparar persistencia": {
+      "main": [
+        [
+          {
+            "node": "W8 — Crear lote editorial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W8 — Crear lote editorial": {
+      "main": [
+        [
+          {
+            "node": "W9 — Guardar activo NEWSLETTER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W9 — Guardar activo NEWSLETTER": {
+      "main": [
+        [
+          {
+            "node": "W10 — Crear versión inicial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W10 — Crear versión inicial": {
+      "main": [
+        [
+          {
+            "node": "W11 — Vincular versión actual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W11 — Vincular versión actual": {
+      "main": [
+        [
+          {
+            "node": "W12 — Recuperar newsletter persistido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2.2 — Reservar lote editorial": {
+      "main": [
+        [
+          {
+            "node": "W2.3 — ¿Reserva nueva?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2.3 — ¿Reserva nueva?": {
+      "main": [
+        [
+          {
+            "node": "W3 — Consultar actividades analizadas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W2.4 — ¿Newsletter ya completado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2.4 — ¿Newsletter ya completado?": {
+      "main": [
+        [
+          {
+            "node": "Respuesta 200 — Newsletter idempotente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W2.5 — ¿Solicitud en proceso?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2.5 — ¿Solicitud en proceso?": {
+      "main": [
+        [
+          {
+            "node": "Respuesta 202 — Solicitud en proceso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta 409 — Solicitud requiere revisión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W4.2 — Marcar lote sin contenido suficiente": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W12 — Recuperar newsletter persistido": {
+      "main": [
+        [
+          {
+            "node": "Respuesta 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a9090840-dba7-4a96-b75b-1b4ebe873ea1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a",
+    "idempotencia_newsletter_v1": "Reserva del lote editorial antes de W3; W8 actualiza el lote reservado. Las solicitudes repetidas completadas devuelven el activo persistido."
+  },
+  "nodeGroups": [],
+  "id": "VE2vZNLP8MqKWgtY",
+  "tags": []
+}

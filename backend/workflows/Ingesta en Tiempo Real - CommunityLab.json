@@ -1,0 +1,273 @@
+{
+  "name": "Ingesta en Tiempo Real - CommunityLab",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🟨 BLOQUE: INGESTA EN TIEMPO REAL\n\nCapturar interacciones de forma asíncrona, resolver automáticamente la Fuente, Canal y Autor (Upsert), y persistir la actividad en estado 'pendiente' sin requerir un lote activo.",
+        "height": 784,
+        "width": 1600,
+        "color": "#223149"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1216,
+        -464
+      ],
+      "typeVersion": 1,
+      "id": "37ea0c0b-b57f-4f3d-9319-c92595b15346",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\n// 1. Extraer el body del webhook de manera segura\nconst input = item.body ? item.body : item;\nconst errores = [];\n\n// 2. Validar campos obligatorios del mensaje individual de Discord\nif (!input.message_id || String(input.message_id).trim() === '') {\n  errores.push(\"El campo 'message_id' es obligatorio.\");\n}\n\nif (!input.channel_id || String(input.channel_id).trim() === '') {\n  errores.push(\"El campo 'channel_id' es obligatorio.\");\n}\n\nif (!input.user_id || String(input.user_id).trim() === '') {\n  errores.push(\"El campo 'user_id' es obligatorio.\");\n}\n\n// Validar que el mensaje tenga texto real\nif (!input.message || typeof input.message !== 'string' || input.message.trim() === '') {\n  errores.push(\"El campo 'message' (texto) está vacío o no es válido.\");\n}\n\nconst esValido = errores.length === 0;\n\n// 3. Devolver el resultado adaptado para el siguiente paso (ej. PostgreSQL)\nreturn [{\n  json: {\n    es_valido: esValido,\n    errores: errores,\n    // Pasamos los datos limpios listos para la base de datos\n    datos_mensaje: input \n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        -64
+      ],
+      "id": "9a1dbce2-64a8-4fe1-a40a-c8249ed4cb7c",
+      "name": "Validar Payload Entrada"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "30dc5c6b-a0cf-4912-9d67-18335e80db76",
+              "leftValue": "={{ $json.es_valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -704,
+        -64
+      ],
+      "id": "f37a39fa-2a3b-4544-93eb-0da7deb8f8ed",
+      "name": "¿ Payload es Válido ?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  status: \"error\",\n  errores: ($json.errores || []).map((msg, i) => ({ codigo: \"VALIDACION_\" + (i + 1), mensaje: msg, detalle: null })),\n  resumen_comunidad: null,\n  activos_distribucion_generados: {},\n  almacenamiento_oci: { bucket: null, ruta_objeto: null, status: \"omitido\" },\n  meta: { modo: \"solo_oci\", procesado_en: $now.toISO() }\n} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -176,
+        144
+      ],
+      "id": "383e12ce-7169-41c2-82c8-97a3f1d74960",
+      "name": "Responder Error 400 (Bad Request)"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "communitylab/actividades",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1152,
+        -48
+      ],
+      "id": "209b929f-d272-4f0d-ad7a-1d9c3c9f2e51",
+      "name": "Trigger: Webhook Discord",
+      "webhookId": "fd6dd057-dc07-46f1-8f3f-84c097682031"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nWITH upsert_fuente AS (\n    INSERT INTO fuente (nombre)\n    VALUES (\n        '{{ $json.origen_comunidad.replace(/'/g, \"''\") }}'\n    )\n    ON CONFLICT (nombre)\n    DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_fuente\n),\n\nupsert_canal AS (\n    INSERT INTO canal (\n        id_fuente,\n        identificador_origen,\n        nombre\n    )\n    SELECT\n        f.id_fuente,\n        '{{ $json.canal.identificador_origen }}',\n        '{{ $json.canal.nombre.replace(/'/g, \"''\") }}'\n    FROM upsert_fuente f\n    ON CONFLICT (id_fuente, identificador_origen)\n        WHERE identificador_origen IS NOT NULL\n    DO UPDATE SET\n        nombre = EXCLUDED.nombre\n    RETURNING id_canal, id_fuente\n),\n\nupsert_autor AS (\n    INSERT INTO autor (\n        id_fuente,\n        identificador_origen,\n        nombre\n    )\n    SELECT\n        f.id_fuente,\n        '{{ $json.autor.identificador_origen.replace(/'/g, \"''\") }}',\n        '{{ $json.autor.nombre.replace(/'/g, \"''\") }}'\n    FROM upsert_fuente f\n    ON CONFLICT (id_fuente, identificador_origen)\n        WHERE identificador_origen IS NOT NULL\n    DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_autor, id_fuente\n)\n\nINSERT INTO actividad (\n    id_fuente,\n    id_canal,\n    id_autor,\n    id_lote,\n    identificador_origen,\n    contenido,\n    momento_origen,\n    contexto,\n    estado_procesamiento\n)\nSELECT\n    f.id_fuente,\n    c.id_canal,\n    a.id_autor,\n    NULL,\n    '{{ $json.identificador_origen.replace(/'/g, \"''\") }}',\n    '{{ $json.contenido.replace(/'/g, \"''\") }}',\n    '{{ $json.timestamp_origen }}'::timestamptz,\n\n    jsonb_build_object(\n        'plataforma', 'Discord',\n        'discord_channel_id',\n        '{{ $json.canal.identificador_origen.replace(/'/g, \"''\") }}'\n    ),\n\n    'pendiente'\n\nFROM upsert_fuente f\nJOIN upsert_canal c\n    ON c.id_fuente = f.id_fuente\nJOIN upsert_autor a\n    ON a.id_fuente = f.id_fuente\n\nON CONFLICT (id_fuente, identificador_origen)\n    WHERE identificador_origen IS NOT NULL\nDO UPDATE SET\n    id_canal = EXCLUDED.id_canal,\n    id_autor = EXCLUDED.id_autor,\n    contenido = EXCLUDED.contenido,\n    momento_origen = EXCLUDED.momento_origen,\n    contexto = EXCLUDED.contexto,\n    estado_procesamiento = CASE\n        WHEN actividad.contenido IS DISTINCT FROM EXCLUDED.contenido\n          OR actividad.momento_origen IS DISTINCT FROM EXCLUDED.momento_origen\n        THEN 'pendiente'\n        ELSE actividad.estado_procesamiento\n    END\n\nRETURNING\n    id_actividad,\n    id_lote,\n    identificador_origen,\n    estado_procesamiento,\n    creado_en;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -176,
+        -160
+      ],
+      "id": "f1129d0f-a88c-4490-ab70-42dc71307583",
+      "name": "W. Persistencia en Tiempo Real (Actividad Pendiente)",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        48,
+        -160
+      ],
+      "id": "c5b95155-932c-434e-a8f7-83fe2e4b9172",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * NORMALIZADOR DE MENSAJE INDIVIDUAL - Simplificado\n */\n\nconst items = $input.all();\nif (items.length === 0) return [];\n\nconst itemActual = items[0].json;\nlet data = itemActual.datos_mensaje || itemActual.payload_original || itemActual.body || itemActual;\nif (data.body) data = data.body;\n\n// Extraer los valores necesarios del mensaje de Python\nconst servidorNombre = data.server_name || \"Servidor_G10\";\nconst mensajeId = String(data.message_id || \"\");\nconst contenidoTexto = (data.message || \"\").trim();\nconst timestampOriginal = data.timestamp || new Date().toISOString();\n\nconst canalId = String(data.channel_id || \"\");\nconst canalNombre = data.channel_name ? `#${data.channel_name}` : \"#general\";\n\nconst autorId = String(data.user_id || \"\");\nconst autorNombre = data.display_name || data.username || \"Anónimo\";\n\n// Retornar la estructura JSON limpia y simplificada\nreturn [{\n  json: {\n    origen_comunidad: `Discord_${servidorNombre.replace(/\\s+/g, '_')}`,\n    identificador_origen: mensajeId,\n    contenido: contenidoTexto,\n    timestamp_origen: timestampOriginal,\n    canal: {\n      identificador_origen: canalId,\n      nombre: canalNombre\n    },\n    autor: {\n      identificador_origen: autorId,\n      nombre: autorNombre\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        -160
+      ],
+      "id": "d29a43e2-87e7-415f-9451-72c983c61311",
+      "name": "Normalizador de Esquema"
+    }
+  ],
+  "pinData": {
+    "Trigger: Webhook Discord": [
+      {
+        "json": {
+          "headers": {
+            "host": "metro-cookie-steal-headset.trycloudflare.com",
+            "user-agent": "python-requests/2.34.2",
+            "content-length": "405",
+            "accept": "*/*",
+            "accept-encoding": "gzip",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "189.28.95.137",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "BO",
+            "cf-ray": "a49aa169b83800eb-SCL",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-warp-tag-id": "a821d0d2-6b2e-473d-be1d-79fc3b56c8db",
+            "cf-worker": "trycloudflare.com",
+            "connection": "keep-alive",
+            "content-type": "application/json",
+            "x-forwarded-for": "189.28.95.137",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "server_id": "1557212261112745984",
+            "server_name": "Servidor G10 Pruebas",
+            "message_id": "1559379964942483487",
+            "channel_id": "1557976241410150400",
+            "channel_name": "feedback-cursos",
+            "user_id": "1322371657142370345",
+            "username": "roxan_any_77786",
+            "display_name": "Roxana Guzmán",
+            "mention": "<@1322371657142370345>",
+            "message": "mensaje de prueba",
+            "timestamp": "2026-10-13T01:39:15.521000+00:00"
+          },
+          "webhookUrl": "http://localhost:5678/webhook-test/communitylab/actividades",
+          "executionMode": "test"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Validar Payload Entrada": {
+      "main": [
+        [
+          {
+            "node": "¿ Payload es Válido ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿ Payload es Válido ?": {
+      "main": [
+        [
+          {
+            "node": "Normalizador de Esquema",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Error 400 (Bad Request)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger: Webhook Discord": {
+      "main": [
+        [
+          {
+            "node": "Validar Payload Entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W. Persistencia en Tiempo Real (Actividad Pendiente)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizador de Esquema": {
+      "main": [
+        [
+          {
+            "node": "W. Persistencia en Tiempo Real (Actividad Pendiente)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b8916ef6-4f51-4ce6-954c-3cb89e933f52",
+  "meta": {
+    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+  },
+  "nodeGroups": [],
+  "id": "5ga4bbx3sT1rodpH",
+  "tags": []
+}
