@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "titulo": { "type": "string" },
+    "copy": { "type": "string" },
+    "canal_recomendado": { "type": "string" },
+    "potencial_engagement": { "type": "string", "enum": ["Alto", "Medio", "Bajo"] },
+    "hashtags": { "type": "array", "items": { "type": "string" } },
+    "origen_interacciones": { "type": "array", "items": { "type": "string" } },
+    "tipo_experiencia": {
+      "type": "string",
+      "enum": ["logro_laboral", "experiencia_proyecto", "aprendizaje_tecnico", "testimonio_formacion"]
+    },
+    "omitido": { "type": "boolean" },
+    "motivo": { "type": "string" }
+  },
+  "required": [
+    "titulo",
+    "copy",
+    "canal_recomendado",
+    "potencial_engagement",
+    "hashtags",
+    "origen_interacciones"
+  ]
+}
