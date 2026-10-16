@@ -1,7 +1,5 @@
 BEGIN;
 
-BEGIN;
-
 CREATE TABLE fuente (
     id_fuente       BIGSERIAL PRIMARY KEY,
     nombre          VARCHAR(150) NOT NULL,
@@ -326,28 +324,64 @@ COMMENT ON COLUMN activo_generado.id_version_aprobada IS
 
 CREATE TABLE almacenamiento_oci (
     id_almacenamiento   BIGSERIAL PRIMARY KEY,
-    id_lote             BIGINT       NOT NULL,
+    id_version          BIGINT       NOT NULL,
     bucket              VARCHAR(200),
     ruta_objeto         TEXT,
     status              VARCHAR(30)  NOT NULL DEFAULT 'pendiente',
+    checksum_sha256     CHAR(64),
+    intentos            INTEGER      NOT NULL DEFAULT 0,
+    proximo_intento_en  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    ultimo_intento_en   TIMESTAMPTZ,
+    procesando_desde    TIMESTAMPTZ,
     detalle_error       TEXT,
+    guardado_en         TIMESTAMPTZ,
     creado_en           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     actualizado_en      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT fk_oci_lote
-        FOREIGN KEY (id_lote) REFERENCES lote_procesamiento (id_lote)
+    CONSTRAINT fk_oci_version
+        FOREIGN KEY (id_version) REFERENCES version_activo (id_version)
         ON DELETE CASCADE ON UPDATE CASCADE,
 
-    CONSTRAINT uq_oci_lote UNIQUE (id_lote),
+    -- Una versión tiene como máximo un registro de almacenamiento OCI.
+    -- Los reintentos actualizan este registro, no crean uno nuevo.
+    CONSTRAINT uq_oci_version UNIQUE (id_version),
 
     CONSTRAINT ck_oci_status CHECK (
-        status IN ('pendiente', 'guardado_con_exito', 'error', 'omitido')
+        status IN ('pendiente', 'procesando', 'guardado_con_exito', 'error', 'omitido')
+    ),
+    CONSTRAINT ck_oci_intentos_no_negativos CHECK (intentos >= 0),
+    CONSTRAINT ck_oci_checksum_sha256 CHECK (
+        checksum_sha256 IS NULL OR checksum_sha256 ~ '^[0-9a-fA-F]{64}$'
     )
 );
 
 CREATE INDEX ix_oci_status ON almacenamiento_oci (status);
+CREATE INDEX ix_oci_guardado_en ON almacenamiento_oci (guardado_en DESC);
+CREATE INDEX ix_oci_reintentos_programados
+    ON almacenamiento_oci (status, proximo_intento_en)
+    WHERE status IN ('pendiente', 'error');
+CREATE INDEX ix_oci_procesos_estancados
+    ON almacenamiento_oci (procesando_desde)
+    WHERE status = 'procesando';
 
-COMMENT ON TABLE almacenamiento_oci IS 'Referencia al paquete del lote en OCI Object Storage (0..1 por lote).';
+COMMENT ON TABLE almacenamiento_oci IS
+    'Referencia al objeto de OCI asociado a una versión concreta de un activo; máximo un registro por versión.';
+COMMENT ON COLUMN almacenamiento_oci.id_version IS
+    'Versión exacta almacenada. El flujo de aprobación debe registrar únicamente la versión aprobada.';
+COMMENT ON COLUMN almacenamiento_oci.ruta_objeto IS
+    'Ruta del objeto JSON en OCI Object Storage.';
+COMMENT ON COLUMN almacenamiento_oci.checksum_sha256 IS
+    'Hash SHA-256 del contenido serializado enviado a OCI, cuando esté disponible.';
+COMMENT ON COLUMN almacenamiento_oci.intentos IS
+    'Cantidad de intentos de persistencia realizados para esta versión.';
+COMMENT ON COLUMN almacenamiento_oci.proximo_intento_en IS
+    'Momento a partir del cual el registro puede ser procesado o reintentado.';
+COMMENT ON COLUMN almacenamiento_oci.ultimo_intento_en IS
+    'Fecha y hora del último intento de persistencia iniciado.';
+COMMENT ON COLUMN almacenamiento_oci.procesando_desde IS
+    'Inicio del intento actualmente en curso; permite detectar ejecuciones estancadas.';
+COMMENT ON COLUMN almacenamiento_oci.guardado_en IS
+    'Fecha y hora de confirmación de almacenamiento exitoso en OCI.';
 
 CREATE OR REPLACE FUNCTION set_actualizado_en()
 RETURNS TRIGGER AS $$
@@ -373,7 +407,9 @@ CREATE TRIGGER trg_oci_actualizado
     BEFORE UPDATE ON almacenamiento_oci
     FOR EACH ROW EXECUTE PROCEDURE set_actualizado_en();
 
-CREATE OR REPLACE VIEW v_lote_resumen AS
+DROP VIEW IF EXISTS v_lote_resumen;
+
+CREATE VIEW v_lote_resumen AS
 SELECT
     l.id_lote,
     f.nombre AS origen_comunidad,
@@ -387,18 +423,136 @@ SELECT
     l.error_resumen,
     l.creado_en,
     l.finalizado_en,
+    (SELECT COUNT(*)
+        FROM actividad a
+        WHERE a.id_lote = l.id_lote) AS actividades_count,
+    (SELECT COUNT(*)
+        FROM activo_generado ag
+        WHERE ag.id_lote = l.id_lote) AS activos_count,
+    (SELECT COUNT(*)
+        FROM activo_generado ag
+        WHERE ag.id_lote = l.id_lote
+          AND ag.estado_curaduria = 'borrador') AS activos_borrador_count,
+    (SELECT COUNT(*)
+        FROM almacenamiento_oci o
+        JOIN version_activo v ON v.id_version = o.id_version
+        JOIN activo_generado ag ON ag.id_activo = v.id_activo
+        WHERE ag.id_lote = l.id_lote) AS oci_objetos_count,
+    (SELECT COUNT(*)
+        FROM almacenamiento_oci o
+        JOIN version_activo v ON v.id_version = o.id_version
+        JOIN activo_generado ag ON ag.id_activo = v.id_activo
+        WHERE ag.id_lote = l.id_lote
+          AND o.status = 'pendiente') AS oci_pendientes_count,
+    (SELECT COUNT(*)
+        FROM almacenamiento_oci o
+        JOIN version_activo v ON v.id_version = o.id_version
+        JOIN activo_generado ag ON ag.id_activo = v.id_activo
+        WHERE ag.id_lote = l.id_lote
+          AND o.status = 'guardado_con_exito') AS oci_guardados_count,
+    (SELECT COUNT(*)
+        FROM almacenamiento_oci o
+        JOIN version_activo v ON v.id_version = o.id_version
+        JOIN activo_generado ag ON ag.id_activo = v.id_activo
+        WHERE ag.id_lote = l.id_lote
+          AND o.status = 'error') AS oci_errores_count,
+    (SELECT COUNT(*)
+        FROM almacenamiento_oci o
+        JOIN version_activo v ON v.id_version = o.id_version
+        JOIN activo_generado ag ON ag.id_activo = v.id_activo
+        WHERE ag.id_lote = l.id_lote
+          AND o.status = 'omitido') AS oci_omitidos_count,
+    CASE
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+        ) THEN 'sin_registros'
+        WHEN NOT EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+              AND o.status <> 'omitido'
+        ) THEN 'omitido'
+        WHEN EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+              AND o.status = 'guardado_con_exito'
+        ) AND EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+              AND o.status <> 'guardado_con_exito'
+        ) THEN 'parcial'
+        WHEN EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+              AND o.status = 'error'
+        ) THEN 'error'
+        WHEN EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+              AND o.status = 'pendiente'
+        ) THEN 'pendiente'
+        WHEN EXISTS (
+            SELECT 1
+            FROM almacenamiento_oci o
+            JOIN version_activo v ON v.id_version = o.id_version
+            JOIN activo_generado ag ON ag.id_activo = v.id_activo
+            WHERE ag.id_lote = l.id_lote
+              AND o.status = 'procesando'
+        ) THEN 'procesando'
+        ELSE 'guardado_con_exito'
+    END AS oci_status
+FROM lote_procesamiento l
+JOIN fuente f ON f.id_fuente = l.id_fuente;
+
+COMMENT ON VIEW v_lote_resumen IS
+    'Listado de lotes para panel y reproceso, con conteos y estado agregado de almacenamiento OCI.';
+
+CREATE OR REPLACE VIEW v_activos_versiones_oci AS
+SELECT
+    l.id_lote,
+    ag.id_activo,
+    ag.tipo_activo,
+    ag.estado_curaduria,
+    v.id_version,
+    v.numero_version,
+    v.origen_version,
+    v.creado_en AS version_creada_en,
+    (ag.id_version_aprobada = v.id_version) AS es_version_aprobada,
+    o.id_almacenamiento,
     o.status AS oci_status,
     o.bucket AS oci_bucket,
     o.ruta_objeto AS oci_ruta_objeto,
-    (SELECT COUNT(*) FROM actividad a WHERE a.id_lote = l.id_lote) AS actividades_count,
-    (SELECT COUNT(*) FROM activo_generado ag WHERE ag.id_lote = l.id_lote) AS activos_count,
-    (SELECT COUNT(*) FROM activo_generado ag
-        WHERE ag.id_lote = l.id_lote AND ag.estado_curaduria = 'borrador') AS activos_borrador_count
-FROM lote_procesamiento l
-JOIN fuente f ON f.id_fuente = l.id_fuente
-LEFT JOIN almacenamiento_oci o ON o.id_lote = l.id_lote;
+    o.checksum_sha256 AS oci_checksum_sha256,
+    o.intentos AS oci_intentos,
+    o.detalle_error AS oci_detalle_error,
+    o.guardado_en AS oci_guardado_en,
+    o.creado_en AS oci_registro_creado_en,
+    o.actualizado_en AS oci_actualizado_en
+FROM activo_generado ag
+JOIN lote_procesamiento l ON l.id_lote = ag.id_lote
+JOIN version_activo v ON v.id_activo = ag.id_activo
+LEFT JOIN almacenamiento_oci o ON o.id_version = v.id_version;
 
-COMMENT ON VIEW v_lote_resumen IS 'Listado de lotes de análisis para panel y reproceso.';
+COMMENT ON VIEW v_activos_versiones_oci IS
+    'Consulta de activos y versiones, indicando cuál está aprobada y su estado de almacenamiento OCI.';
 
 CREATE OR REPLACE VIEW v_actividades_pendientes AS
 SELECT
@@ -422,5 +576,247 @@ WHERE a.estado_procesamiento = 'pendiente'
 ORDER BY a.creado_en;
 
 COMMENT ON VIEW v_actividades_pendientes IS 'Cola para el job batch: actividades pendientes de análisis.';
+
+
+
+-- Aprueba la versión actual y registra su almacenamiento OCI pendiente
+-- dentro de la misma transacción de la llamada a esta función.
+CREATE OR REPLACE FUNCTION public.communitylab_aprobar_activo(
+    p_id_activo BIGINT,
+    p_comentario_curaduria TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+    id_activo BIGINT,
+    id_lote BIGINT,
+    tipo_activo VARCHAR(50),
+    estado_curaduria VARCHAR(30),
+    id_version_actual BIGINT,
+    id_version_aprobada BIGINT,
+    comentario_curaduria TEXT,
+    revisado_en TIMESTAMPTZ,
+    actualizado_en TIMESTAMPTZ,
+    id_almacenamiento BIGINT,
+    oci_status VARCHAR(30),
+    status_http INTEGER,
+    resultado TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_activo activo_generado%ROWTYPE;
+    v_id_almacenamiento BIGINT;
+    v_oci_status VARCHAR(30);
+BEGIN
+    -- Serializa solicitudes concurrentes de aprobación para el mismo activo.
+    SELECT ag.*
+      INTO v_activo
+      FROM activo_generado AS ag
+     WHERE ag.id_activo = p_id_activo
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN QUERY
+        SELECT
+            NULL::BIGINT,
+            NULL::BIGINT,
+            NULL::VARCHAR(50),
+            NULL::VARCHAR(30),
+            NULL::BIGINT,
+            NULL::BIGINT,
+            NULL::TEXT,
+            NULL::TIMESTAMPTZ,
+            NULL::TIMESTAMPTZ,
+            NULL::BIGINT,
+            NULL::VARCHAR(30),
+            404::INTEGER,
+            'not_found'::TEXT;
+        RETURN;
+    END IF;
+
+    IF v_activo.estado_curaduria <> 'borrador'
+       OR v_activo.id_version_actual IS NULL THEN
+        RETURN QUERY
+        SELECT
+            v_activo.id_activo,
+            v_activo.id_lote,
+            v_activo.tipo_activo,
+            v_activo.estado_curaduria,
+            v_activo.id_version_actual,
+            v_activo.id_version_aprobada,
+            v_activo.comentario_curaduria,
+            v_activo.revisado_en,
+            v_activo.actualizado_en,
+            NULL::BIGINT,
+            NULL::VARCHAR(30),
+            409::INTEGER,
+            'state_conflict'::TEXT;
+        RETURN;
+    END IF;
+
+    -- La FK verifica que exista la versión, pero esta comprobación adicional
+    -- garantiza que la versión actual pertenezca al activo que se aprueba.
+    IF NOT EXISTS (
+        SELECT 1
+          FROM version_activo AS va
+         WHERE va.id_version = v_activo.id_version_actual
+           AND va.id_activo = v_activo.id_activo
+    ) THEN
+        RETURN QUERY
+        SELECT
+            v_activo.id_activo,
+            v_activo.id_lote,
+            v_activo.tipo_activo,
+            v_activo.estado_curaduria,
+            v_activo.id_version_actual,
+            v_activo.id_version_aprobada,
+            v_activo.comentario_curaduria,
+            v_activo.revisado_en,
+            v_activo.actualizado_en,
+            NULL::BIGINT,
+            NULL::VARCHAR(30),
+            409::INTEGER,
+            'invalid_current_version'::TEXT;
+        RETURN;
+    END IF;
+
+    UPDATE activo_generado AS ag
+       SET estado_curaduria = 'aprobado',
+           id_version_aprobada = v_activo.id_version_actual,
+           comentario_curaduria = p_comentario_curaduria,
+           revisado_en = NOW(),
+           actualizado_en = NOW()
+     WHERE ag.id_activo = v_activo.id_activo
+    RETURNING ag.* INTO v_activo;
+
+    -- Una fila por versión. Si ya existe, no se reinicia ni se duplica:
+    -- esto conserva el estado de una carga previa de esa misma versión.
+    INSERT INTO almacenamiento_oci (id_version, status)
+    VALUES (v_activo.id_version_aprobada, 'pendiente')
+    ON CONFLICT (id_version) DO NOTHING
+    RETURNING almacenamiento_oci.id_almacenamiento INTO v_id_almacenamiento;
+
+    IF v_id_almacenamiento IS NULL THEN
+        SELECT o.id_almacenamiento, o.status
+          INTO v_id_almacenamiento, v_oci_status
+          FROM almacenamiento_oci AS o
+         WHERE o.id_version = v_activo.id_version_aprobada;
+    ELSE
+        v_oci_status := 'pendiente';
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        v_activo.id_activo,
+        v_activo.id_lote,
+        v_activo.tipo_activo,
+        v_activo.estado_curaduria,
+        v_activo.id_version_actual,
+        v_activo.id_version_aprobada,
+        v_activo.comentario_curaduria,
+        v_activo.revisado_en,
+        v_activo.actualizado_en,
+        v_id_almacenamiento,
+        v_oci_status,
+        200::INTEGER,
+        'ok'::TEXT;
+END;
+$$;
+
+COMMENT ON FUNCTION public.communitylab_aprobar_activo(BIGINT, TEXT) IS
+    'Aprueba la versión actual de un activo y crea su registro OCI pendiente atómicamente; no realiza llamadas a OCI.';
+
+
+CREATE OR REPLACE FUNCTION public.communitylab_editar_activo(
+    p_id_activo BIGINT,
+    p_contenido JSONB,
+    p_motivo_cambio TEXT,
+    p_creado_por VARCHAR(150)
+)
+RETURNS TABLE (
+    id_activo BIGINT,
+    id_lote BIGINT,
+    tipo_activo VARCHAR(50),
+    estado_curaduria VARCHAR(30),
+    id_version_actual BIGINT,
+    id_version_aprobada BIGINT,
+    actualizado_en TIMESTAMPTZ,
+    numero_version INTEGER,
+    origen_version VARCHAR(20),
+    contenido JSONB,
+    motivo_cambio TEXT,
+    creado_por VARCHAR(150),
+    creado_en TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_activo activo_generado%ROWTYPE;
+    v_numero_version INTEGER;
+    v_id_version BIGINT;
+BEGIN
+    SELECT ag.*
+      INTO v_activo
+      FROM activo_generado AS ag
+     WHERE ag.id_activo = p_id_activo
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+
+    IF v_activo.estado_curaduria = 'publicado' THEN
+        RETURN;
+    END IF;
+
+    SELECT COALESCE(MAX(va.numero_version), 0) + 1
+      INTO v_numero_version
+      FROM version_activo AS va
+     WHERE va.id_activo = p_id_activo;
+
+    INSERT INTO version_activo (
+        id_activo,
+        numero_version,
+        contenido,
+        origen_version,
+        motivo_cambio,
+        creado_por
+    )
+    VALUES (
+        p_id_activo,
+        v_numero_version,
+        p_contenido,
+        'usuario',
+        p_motivo_cambio,
+        p_creado_por
+    )
+    RETURNING version_activo.id_version INTO v_id_version;
+
+    UPDATE activo_generado AS ag
+       SET contenido = p_contenido,
+           id_version_actual = v_id_version,
+           actualizado_en = NOW(),
+           estado_curaduria = 'borrador'
+     WHERE ag.id_activo = p_id_activo;
+
+    RETURN QUERY
+    SELECT
+        ag.id_activo,
+        ag.id_lote,
+        ag.tipo_activo,
+        ag.estado_curaduria,
+        ag.id_version_actual,
+        ag.id_version_aprobada,
+        ag.actualizado_en,
+        va.numero_version,
+        va.origen_version,
+        va.contenido,
+        va.motivo_cambio,
+        va.creado_por,
+        va.creado_en
+    FROM activo_generado AS ag
+    JOIN version_activo AS va ON va.id_version = v_id_version
+    WHERE ag.id_activo = p_id_activo;
+END;
+$$;
 
 COMMIT;
