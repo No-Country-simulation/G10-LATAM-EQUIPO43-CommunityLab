@@ -507,7 +507,239 @@
       "name": "Sticky Note - Mocks y Merge"
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Analista de Contenido (LLM)": [
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Positivo",
+            "tema_categoria": "Otro",
+            "tema_libre": "Inicio de aprendizaje en OCI y LangGraph",
+            "score_relevancia": 3,
+            "tipo_insight": "ninguno",
+            "resumen": "El usuario se presenta a la comunidad tras unirse al servidor y menciona que está comenzando a aprender sobre OCI y LangGraph, solicitando consejos generales.",
+            "cita_extraida": "Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido",
+            "razon_relevancia": "Es un mensaje de presentación y saludo inicial. Aunque identifica tecnologías de interés para la comunidad, no contiene una duda técnica específica ni un testimonio de impacto."
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Neutral",
+            "tema_categoria": "Duda Técnica",
+            "tema_libre": "Latencia en agentes con memoria",
+            "score_relevancia": 8,
+            "tipo_insight": "duda_recurrente",
+            "resumen": "El estudiante consulta sobre un aumento de latencia observado en agentes con memoria después de diez turnos de interacción en un entorno local.",
+            "cita_extraida": "el agente con memory se pone lento después de 10 turnos",
+            "razon_relevancia": "Plantea un problema técnico específico y medible que permite generar contenido educativo sobre optimización de rendimiento y gestión de memoria en aplicaciones de IA."
+          }
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Muy Positivo",
+            "tema_categoria": "Logro Laboral",
+            "tema_libre": "Entrevista técnica sobre agentes y LangGraph",
+            "score_relevancia": 9,
+            "tipo_insight": "testimonio",
+            "resumen": "El estudiante comparte que obtuvo su primera entrevista técnica y pudo explicar con éxito conceptos de LangGraph aprendidos en el módulo de agentes.",
+            "cita_extraida": "¡Logré mi primera entrevista técnica gracias al módulo de agentes!",
+            "razon_relevancia": "Es un testimonio de éxito directo que vincula el contenido específico del curso con una oportunidad laboral real, mencionando tecnologías actuales de alta demanda."
+          }
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Positivo",
+            "tema_categoria": "Otro",
+            "tema_libre": "Compartir oferta laboral en IA y Python",
+            "score_relevancia": 6,
+            "tipo_insight": "ninguno",
+            "resumen": "El usuario comparte una vacante remota para una startup de IA dirigida a perfiles mid-level con conocimientos en Python y orquestación de agentes.",
+            "cita_extraida": "startup de AI en remoto busca mid-level con experiencia en Python + orquestación de agentes",
+            "razon_relevancia": "Aunque es una oferta externa, demuestra que la comunidad es un espacio activo de networking y valida la demanda laboral de las tecnologías que se enseñan en la plataforma."
+          }
+        },
+        "pairedItem": {
+          "item": 3
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Neutral",
+            "tema_categoria": "Duda Técnica",
+            "tema_libre": "Diferencia entre StateGraph y MessageGraph",
+            "score_relevancia": 8,
+            "tipo_insight": "duda_recurrente",
+            "resumen": "El estudiante solicita ejemplos prácticos y casos reales para entender la diferencia y los criterios de elección entre StateGraph y MessageGraph, señalando que la explicación del curso no es suficiente.",
+            "cita_extraida": "no veo un ejemplo claro de cuándo conviene uno u otro",
+            "razon_relevancia": "Identifica un vacío específico en el material educativo y solicita casos de uso reales, lo que permite generar contenido complementario de alto valor."
+          }
+        },
+        "pairedItem": {
+          "item": 4
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Neutral",
+            "tema_categoria": "Duda Técnica",
+            "tema_libre": "Manejo de estado y reducers en grafos",
+            "score_relevancia": 7,
+            "tipo_insight": "duda_recurrente",
+            "resumen": "El estudiante pregunta cómo mantener el contexto al pasar resultados de herramientas entre nodos y si es necesario configurar un reducer explícito en el estado.",
+            "cita_extraida": "¿Hay que usar un reducer explícito en el state o alcanza con el default?",
+            "razon_relevancia": "Es una duda técnica específica sobre la gestión de estados en flujos de trabajo complejos, lo cual es ideal para generar contenido educativo tipo FAQ o tutoriales técnicos."
+          }
+        },
+        "pairedItem": {
+          "item": 5
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Positivo",
+            "tema_categoria": "Duda Técnica",
+            "tema_libre": "Versioning de schema en Postgres checkpointing",
+            "score_relevancia": 8,
+            "tipo_insight": "ninguno",
+            "resumen": "El usuario comparte un consejo técnico sobre la importancia de versionar el esquema del estado al usar checkpointing en Postgres para evitar que cambios en los campos rompan procesos antiguos.",
+            "cita_extraida": "si usás checkpointing con Postgres, fijate de versionar el schema del state",
+            "razon_relevancia": "Ofrece una solución técnica muy específica y accionable basada en una experiencia real de error, lo cual es ideal para crear contenido educativo de tipo 'mejores prácticas'."
+          }
+        },
+        "pairedItem": {
+          "item": 6
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Neutral",
+            "tema_categoria": "Duda Técnica",
+            "tema_libre": "Despliegue en OCI: Functions vs Compute",
+            "score_relevancia": 8,
+            "tipo_insight": "duda_recurrente",
+            "resumen": "El usuario consulta sobre la viabilidad de desplegar un agente en OCI Functions frente a instancias Compute, analizando el balance entre costos y el impacto del cold start en un chatbot.",
+            "cita_extraida": "cold start me preocupa para un chatbot de soporte",
+            "razon_relevancia": "Plantea un dilema técnico real y específico sobre arquitectura cloud y optimización de recursos, lo cual es muy valioso para generar contenido educativo comparativo."
+          }
+        },
+        "pairedItem": {
+          "item": 7
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Neutral",
+            "tema_categoria": "Duda Técnica",
+            "tema_libre": "Timeout en OCI SDK con Python 3.12 y Object Storage",
+            "score_relevancia": 7,
+            "tipo_insight": "duda_recurrente",
+            "resumen": "El estudiante reporta un error de timeout al subir archivos de gran tamaño a Object Storage utilizando el SDK de OCI en Python 3.12 y solicita una solución alternativa.",
+            "cita_extraida": "al subir un objeto grande a Object Storage me tira timeout aunque el connection pool está ok",
+            "razon_relevancia": "Es una consulta técnica muy específica que involucra versiones recientes de software y un caso de uso avanzado, lo cual es ideal para crear guías de resolución de problemas o contenido especializado."
+          }
+        },
+        "pairedItem": {
+          "item": 8
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Muy Positivo",
+            "tema_categoria": "Feedback de Curso",
+            "tema_libre": "Prompt engineering con outputs estructurados",
+            "score_relevancia": 8,
+            "tipo_insight": "feedback",
+            "resumen": "El estudiante califica como excelente el módulo de prompt engineering y sugiere incluir más ejemplos prácticos de few-shot utilizando esquemas JSON.",
+            "cita_extraida": "me gustaría más ejemplos de few-shot con outputs estructurados (JSON schema)",
+            "razon_relevancia": "Proporciona una sugerencia técnica muy específica y accionable para mejorar el contenido, validando al mismo tiempo la alta calidad del material actual."
+          }
+        },
+        "pairedItem": {
+          "item": 9
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Neutral",
+            "tema_categoria": "Feedback de Curso",
+            "tema_libre": "Sugerencia de lab para evaluación de agentes",
+            "score_relevancia": 8,
+            "tipo_insight": "feedback",
+            "resumen": "El estudiante sugiere ampliar la sección de evaluación de agentes mediante la creación de un laboratorio práctico que utilice datasets pequeños para medir métricas de fidelidad y precisión de herramientas.",
+            "cita_extraida": "Sería genial un lab donde midamos faithfulness y tool accuracy con un dataset chico.",
+            "razon_relevancia": "El mensaje es altamente relevante porque propone una mejora técnica específica y actual, mencionando métricas concretas que pueden transformarse directamente en nuevo contenido educativo."
+          }
+        },
+        "pairedItem": {
+          "item": 10
+        }
+      },
+      {
+        "json": {
+          "output": {
+            "sentimiento": "Muy Positivo",
+            "tema_categoria": "Testimonio de Proyecto",
+            "tema_libre": "Implementación de flujo de onboarding con LangGraph y human-in-the-loop",
+            "score_relevancia": 9,
+            "tipo_insight": "testimonio",
+            "resumen": "El estudiante completó el track de LangGraph y logró construir un flujo de onboarding funcional con human-in-the-loop, destacando su progreso desde no entender grafos hasta la implementación técnica.",
+            "cita_extraida": "armé un flujo de onboarding con human-in-the-loop y funciona",
+            "razon_relevancia": "Es un testimonio de éxito muy específico que destaca una funcionalidad avanzada y el progreso real del alumno, lo cual es ideal para contenido de marketing y validación del curso."
+          }
+        },
+        "pairedItem": {
+          "item": 11
+        }
+      }
+    ],
+    "Generador de Post para LinkedIn": [
+      {
+        "json": {
+          "output": {
+            "titulo": "Primera entrevista técnica y el dominio de LangGraph",
+            "copy": "Primera entrevista técnica: un hito que se celebra.\n\nLaura Gómez nos compartió que consiguió su primera entrevista técnica tras completar el módulo de agentes. Durante el proceso, le preguntaron por LangGraph y pudo explicar el grafo de estados sin inconvenientes.\n\n\"¡Logré mi primera entrevista técnica gracias al módulo de agentes!\", nos contó con entusiasmo. Este avance refleja cómo el estudio constante permite comunicar conceptos complejos con seguridad frente a un reclutador.\n\nSabemos que el camino del aprendizaje técnico tiene sus retos, pero ver estos resultados nos motiva a seguir. ¡Mucho éxito en los siguientes pasos, Laura! 💪\n\nSi tú también estás preparándote para tu primera entrevista, cuéntanos qué tema te genera más curiosidad.",
+            "canal_recomendado": "LinkedIn Oficial",
+            "potencial_engagement": "Alto",
+            "hashtags": [
+              "#LangGraph",
+              "#IA",
+              "#EntrevistaTécnica",
+              "#ComunidadTech"
+            ],
+            "origen_interacciones": [
+              "Laura Gómez"
+            ],
+            "tipo_experiencia": "logro_laboral"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
   "connections": {
     "Analista de Contenido (LLM)": {
       "main": [

@@ -186,28 +186,6 @@
     },
     {
       "parameters": {
-        "model": "openrouter/free",
-        "options": {
-          "temperature": 0.6
-        }
-      },
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
-      "typeVersion": 1,
-      "position": [
-        -16,
-        1632
-      ],
-      "id": "a21b5fd4-11d6-46ac-bb07-7c1d603d8267",
-      "name": "OpenRouter Chat Model",
-      "credentials": {
-        "openRouterApi": {
-          "id": "LggebCc9i8in5Mr3",
-          "name": "OpenRouter account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "promptType": "define",
         "text": "=Genera la newsletter semanal a partir de las actividades analizadas y seleccionadas del período:\n\n{{ JSON.stringify($json, null, 2) }}",
         "hasOutputParser": true,
@@ -706,6 +684,27 @@
       ],
       "id": "08a62df5-d72b-4080-abdd-0b497b295e7e",
       "name": "STICKY 08 — Contrato de errores y operación"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        1632
+      ],
+      "id": "0e876b86-1557-46bb-b6eb-ebf438d2fe50",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Jw8oa1tQEtM6ZGSP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -785,17 +784,6 @@
           {
             "node": "W4.2 — Marcar lote sin contenido suficiente",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenRouter Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "W5. Generador Newsletter",
-            "type": "ai_languageModel",
             "index": 0
           }
         ]
@@ -975,6 +963,17 @@
           }
         ]
       ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "W5. Generador Newsletter",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -982,8 +981,9 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "b82c75b9-3f14-40e9-957c-db902efaa801",
+  "versionId": "6d933846-9bf1-4830-9e13-db0fbfda3a08",
   "meta": {
+    "templateCredsSetupCompleted": true,
     "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
   },
   "nodeGroups": [],
