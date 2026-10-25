@@ -4,7 +4,7 @@
 Motor inteligente que transforma la actividad orgánica de una comunidad digital (mensajes, dudas, testimonios) en activos de marketing listos para publicar, usando IA generativa y automatización. Proyecto del Hackathon ONE G10 (Oracle Next Education & Alura).
 
 ## Estado actual
-Sprint 1/5 — Setup inicial completado. Aún sin flujo funcional end-to-end.
+Sprint 5/5 — MVP Funcional End-to-End desplegado en la nube. Pipeline de ingesta, orquestación con IA (Gemini), panel de curaduría en Streamlit y persistencia en OCI Object Storage Always Free.
 
 ## Arquitectura
 
@@ -50,3 +50,8 @@ _(se completa a partir del Sprint 2, cuando haya funcionalidad real)_
 - **Sprint 3**: flujo de automatización en N8N con bifurcación condicional
 - **Sprint 4**: integración con OCI Object Storage + interfaz Streamlit
 - **Sprint 5**: demo final, 3 ejemplos, documentación completa
+
+## Despliegue en Vivo
+- **Panel de Curaduría (Streamlit):** [https://communitylab-g43.streamlit.app](https://communitylab-g43.streamlit.app)
+- **Orquestación (n8n en OCI VM):** `163.176.170.76` (Canonical Ubuntu 22.04)
+- **Persistencia:** OCI Object Storage Always Free (`bucket-communitylab-g43`)
