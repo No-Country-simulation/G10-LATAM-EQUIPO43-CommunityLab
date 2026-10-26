@@ -1,0 +1,209 @@
+{
+  "name": "CommunityLab — Persistencia OCI de Versiones Aprobadas",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        5456,
+        2768
+      ],
+      "id": "5f21fac7-e6d4-485e-8eed-39f8b66715a6",
+      "name": "W1. Disparador — Cada 5 minutos"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH candidatos AS (\n    SELECT o.id_almacenamiento\n    FROM almacenamiento_oci AS o\n    WHERE o.intentos < 8\n      AND (\n          (\n              o.status IN ('pendiente', 'error')\n              AND o.proximo_intento_en <= NOW()\n          )\n          OR\n          (\n              o.status = 'procesando'\n              AND o.procesando_desde < NOW() - INTERVAL '15 minutes'\n          )\n      )\n    ORDER BY o.proximo_intento_en ASC, o.creado_en ASC\n    FOR UPDATE SKIP LOCKED\n    LIMIT 10\n),\nreclamados AS (\n    UPDATE almacenamiento_oci AS o\n    SET status = 'procesando',\n        intentos = o.intentos + 1,\n        ultimo_intento_en = NOW(),\n        procesando_desde = NOW(),\n        detalle_error = NULL,\n        bucket = COALESCE(o.bucket, 'communitylab-activos-marketing'),\n        ruta_objeto = COALESCE(\n            o.ruta_objeto,\n            (\n                SELECT\n                    'activos/' || v.id_activo::TEXT ||\n                    '/versiones/v' || v.numero_version::TEXT ||\n                    '/activo-' || v.id_activo::TEXT ||\n                    '-version-' || v.id_version::TEXT || '.json'\n                FROM version_activo AS v\n                WHERE v.id_version = o.id_version\n            )\n        )\n    FROM candidatos AS c\n    WHERE o.id_almacenamiento = c.id_almacenamiento\n    RETURNING\n        o.id_almacenamiento,\n        o.id_version,\n        o.bucket,\n        o.ruta_objeto,\n        o.intentos\n)\nSELECT\n    r.id_almacenamiento,\n    r.id_version,\n    r.bucket,\n    r.ruta_objeto,\n    r.intentos,\n    v.id_activo,\n    v.numero_version,\n    v.contenido\nFROM reclamados AS r\nJOIN version_activo AS v\n  ON v.id_version = r.id_version\nORDER BY r.id_almacenamiento;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        5696,
+        2768
+      ],
+      "id": "09747316-8c71-43db-b37c-a53ce38e23d9",
+      "name": "W2. PostgreSQL — Reclamar pendientes",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const idActivo = item.json.id_activo;\n  const idVersion = item.json.id_version;\n  const numeroVersion = item.json.numero_version;\n  const fileName = item.json.ruta_objeto;\n\n  const paquete = {\n    meta: {\n      sistema: \"CommunityLab\",\n      id_activo: idActivo,\n      id_version: idVersion,\n      numero_version: numeroVersion,\n      generado_en: new Date().toISOString()\n    },\n    contenido: item.json.contenido\n  };\n\n  const contenidoJson = JSON.stringify(paquete, null, 2);\n  const buffer = Buffer.from(contenidoJson, \"utf8\");\n\n  item.json.nombre_archivo = fileName;\n  item.json.tamano_bytes = buffer.length;\n  item.binary = {\n    data: await this.helpers.prepareBinaryData(\n      buffer,\n      fileName.split(\"/\").pop(),\n      \"application/json\"\n    )\n  };\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5952,
+        2768
+      ],
+      "id": "7fb37138-6e49-4990-81b8-d4d1d2de6cf2",
+      "name": "W3. Preparar JSON y archivo"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $json.bucket }}",
+        "fileName": "={{ $json.ruta_objeto }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        6208,
+        2768
+      ],
+      "id": "6577a81e-2eb6-4eba-9e40-1f69febaa0b1",
+      "name": "W4. S3 — Subir JSON a OCI",
+      "credentials": {
+        "s3": {
+          "id": "cRQGdJUTaPd2kbOa",
+          "name": "S3 account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE almacenamiento_oci\nSET status = 'guardado_con_exito',\n    guardado_en = NOW(),\n    procesando_desde = NULL,\n    detalle_error = NULL,\n    proximo_intento_en = NOW(),\n    actualizado_en = NOW()\nWHERE id_almacenamiento = $1\nRETURNING\n    id_almacenamiento,\n    id_version,\n    status,\n    bucket,\n    ruta_objeto,\n    intentos,\n    guardado_en;",
+        "options": {
+          "queryReplacement": "={{ [ $(\"W3. Preparar JSON y archivo\").item.json.id_almacenamiento ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6496,
+        2688
+      ],
+      "id": "eb69a692-5fa0-4491-a20a-80e1dde8fb6e",
+      "name": "W5. PostgreSQL — Registrar éxito",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE almacenamiento_oci\nSET status = 'error',\n    detalle_error = LEFT($2, 4000),\n    procesando_desde = NULL,\n    proximo_intento_en = NOW()\n        + make_interval(mins => LEAST(60, power(2, LEAST(intentos, 6))::INTEGER)),\n    actualizado_en = NOW()\nWHERE id_almacenamiento = $1\nRETURNING\n    id_almacenamiento,\n    id_version,\n    status,\n    intentos,\n    proximo_intento_en,\n    detalle_error;",
+        "options": {
+          "queryReplacement": "={{ [ $(\"W3. Preparar JSON y archivo\").item.json.id_almacenamiento, String($json.error?.message ?? $json.message ?? \"Error al subir el objeto a OCI\") ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6496,
+        2880
+      ],
+      "id": "52069a1f-cd96-4e65-84da-4a76e524a472",
+      "name": "W6. PostgreSQL — Registrar fallo y reintento",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Este workflow solo persiste versiones ya registradas en almacenamiento_oci. \n\nEl nodo S3 debe usar la credencial OCI/S3 compatible existente y el bucket communitylab-activos-marketing.",
+        "height": 132,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5456,
+        2576
+      ],
+      "id": "e76faba8-85fb-4425-b4d6-21c30da5b136",
+      "name": "Nota — Alcance y configuración"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "W1. Disparador — Cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "W2. PostgreSQL — Reclamar pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2. PostgreSQL — Reclamar pendientes": {
+      "main": [
+        [
+          {
+            "node": "W3. Preparar JSON y archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W3. Preparar JSON y archivo": {
+      "main": [
+        [
+          {
+            "node": "W4. S3 — Subir JSON a OCI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W4. S3 — Subir JSON a OCI": {
+      "main": [
+        [
+          {
+            "node": "W5. PostgreSQL — Registrar éxito",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W6. PostgreSQL — Registrar fallo y reintento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d0068a95-b744-48a6-abce-24c360ce1916",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+  },
+  "nodeGroups": [],
+  "id": "dSqSr9TPlB3TXK0m",
+  "tags": []
+}

@@ -1,0 +1,463 @@
+{
+  "name": "CommunityLab — Consulta de activos y versiones",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "communitylab/activos/:id_activo/versiones",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        5408,
+        9136
+      ],
+      "id": "bc930fb1-d59f-497c-bbbc-0b24b26a1263",
+      "name": "V1. Webhook — Historial de versiones",
+      "webhookId": "c1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.params?.id_activo;\nconst id = Number(raw);\nconst valido = raw !== undefined && raw !== null && String(raw).trim() !== '' && Number.isSafeInteger(id) && id > 0;\nreturn [{ json: { valido, id_activo: valido ? id : null } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5648,
+        9136
+      ],
+      "id": "a1b023e7-cfe0-4ea6-9f5f-86b25e61ceb0",
+      "name": "V2. Validar id_activo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a3333333-3333-4333-8333-333333333333",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5856,
+        9136
+      ],
+      "id": "d601a404-a693-4850-a2ef-9e81386790a4",
+      "name": "V3. ¿ID válido?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH activo AS (\n  SELECT ag.* FROM activo_generado ag WHERE ag.id_activo = $1\n)\nSELECT\n  (SELECT jsonb_build_object(\n    'id_activo', a.id_activo, 'id_lote', a.id_lote, 'tipo_activo', a.tipo_activo,\n    'estado_curaduria', a.estado_curaduria, 'id_version_actual', a.id_version_actual,\n    'id_version_aprobada', a.id_version_aprobada, 'comentario_curaduria', a.comentario_curaduria,\n    'revisado_en', a.revisado_en, 'creado_en', a.creado_en, 'actualizado_en', a.actualizado_en\n  ) FROM activo a) AS activo,\n  COALESCE((\n    SELECT jsonb_agg(jsonb_build_object(\n      'id_version', va.id_version, 'numero_version', va.numero_version, 'contenido', va.contenido,\n      'origen_version', va.origen_version, 'motivo_cambio', va.motivo_cambio,\n      'creado_por', va.creado_por, 'creado_en', va.creado_en,\n      'es_actual', va.id_version = a.id_version_actual,\n      'es_aprobada', va.id_version = a.id_version_aprobada\n    ) ORDER BY va.numero_version DESC)\n    FROM activo a JOIN version_activo va ON va.id_activo = a.id_activo\n  ), '[]'::jsonb) AS versiones,\n  COALESCE((SELECT COUNT(*)::integer FROM activo a JOIN version_activo va ON va.id_activo = a.id_activo), 0) AS total_versiones;",
+        "options": {
+          "queryReplacement": "={{ [$json.id_activo] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6096,
+        9024
+      ],
+      "id": "0917552e-2271-4581-b0e8-4161223701a6",
+      "name": "V4. Consultar activo e historial",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a9999999-9999-4999-8999-999999999999",
+              "leftValue": "={{ $json.activo !== null }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6320,
+        9024
+      ],
+      "id": "4bc43542-c92d-48aa-bc0b-cdfe530753df",
+      "name": "V5. ¿Activo existe?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6544,
+        8944
+      ],
+      "id": "ada37c74-435b-4ad6-82d9-94d3b8acbeff",
+      "name": "V6. Responder historial"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'error', mensaje: 'No existe un activo con ese id_activo' } }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6544,
+        9104
+      ],
+      "id": "a3535b0b-826e-438d-9bf9-51dbf9aefe6e",
+      "name": "V7. Responder activo inexistente"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'error', mensaje: 'id_activo debe ser un entero positivo' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6096,
+        9248
+      ],
+      "id": "1f58a765-0456-429a-8b0c-84dc269e20a9",
+      "name": "V6. Responder ID inválido"
+    },
+    {
+      "parameters": {
+        "content": "## Consulta del historial de versiones\n\n**Endpoint:** GET /webhook/communitylab/activos/:id_activo/versiones\n\n**Objetivo:** recuperar el activo y todas sus versiones sin modificar datos.\n\n**Respuesta 200:** `activo`, `versiones` ordenadas de más reciente a más antigua y `total_versiones`. Cada versión indica `es_actual` y `es_aprobada`.\n\n**Respuesta 400:** `id_activo` ausente o no positivo/entero.\n\n**Respuesta 404:** el activo no existe.\n\n**Importante:** este endpoint no crea, aprueba ni restaura versiones. La consulta utiliza parámetro SQL `$1`. Probar en entorno de pruebas y verificar que `queryReplacement` sea compatible con la versión del nodo PostgreSQL instalada.",
+        "height": 348,
+        "width": 596,
+        "color": "#0B203C"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4720,
+        8976
+      ],
+      "id": "00ab26c4-c94f-42e0-b152-731879e5a1c8",
+      "name": "DOC — Historial de versiones"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"error\": $json.error } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6144,
+        8624
+      ],
+      "id": "b36cba6c-4c20-4f00-a2a7-590a3c8b75f0",
+      "name": "W3.1 Responder solicitud inválida"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6c7544d7-8a30-4193-ba7a-7613d2f0fc17",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5904,
+        8432
+      ],
+      "id": "278a5c3c-9332-4140-a1b1-52977f59166c",
+      "name": "W1.2 ¿id_lote válido?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.query?.id_lote;\nconst value = typeof raw === 'string' ? raw.trim() : raw;\nconst valid = value !== undefined && value !== null && String(value).trim() !== '' && /^\\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) && Number(value) > 0;\nreturn [{ json: valid\n  ? { valid: true, id_lote: String(value).trim() }\n  : { valid: false, statusCode: 400, error: 'id_lote es obligatorio y debe ser un entero positivo.' }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5696,
+        8432
+      ],
+      "id": "3b5484ba-8567-484e-92ef-2de5241caee9",
+      "name": "W1.1 Validar id_lote"
+    },
+    {
+      "parameters": {
+        "content": "## Consulta de activos por lote — contrato y decisiones\n\n**Propósito:** lectura para la interfaz de curaduría. No modifica estados, no crea versiones y no publica activos.\n\n**Entrada:** `GET/POST /communitylab/activos` con `id_lote` en query string. Debe ser un entero positivo.\n\n**Validación:** el nodo Code rechaza valores ausentes, vacíos, no numéricos, decimales, negativos o no seguros. La rama inválida responde `400` con un JSON de error.\n\n**SQL:** usa `$1` y Query Parameters (`queryReplacement`) para evitar interpolar directamente la entrada en el SQL. El lote se filtra siempre por `id_lote`.\n\n**Respuesta válida:** `200` con `{ status, total, activos }`. Si el lote no tiene activos, `activos` es `[]` y `total` es `0`.\n\n**Errores:** configurar/probar el manejo de errores del nodo PostgreSQL para que un fallo inesperado no se presente como una consulta exitosa. `404` es opcional y requiere una consulta adicional para verificar la existencia del lote.\n\n**Pruebas mínimas:** id válido con activos; id válido sin activos; parámetro ausente; texto; decimal; cero/negativo; lote inexistente; error de conexión PostgreSQL.\n\n**Nota:** verifica que tu versión de n8n/Postgres acepte `Query Parameters` como `queryReplacement` en la exportación. Prueba el workflow importado antes de activarlo.",
+        "height": 430,
+        "width": 600,
+        "color": "#0B203C"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4720,
+        8320
+      ],
+      "id": "2d6a17c5-ec7b-411a-baa9-91dc19d3752c",
+      "name": "DOC — Consulta de activos por lote (decisión de arquitectura)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"exito\", \"total\": $input.all().length, \"activos\": $input.all().map(item => item.json) } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6352,
+        8320
+      ],
+      "id": "e69e75a7-387c-48b2-aa44-6a284157a1fb",
+      "name": "W3. Responder Consulta de Activos"
+    },
+    {
+      "parameters": {
+        "path": "communitylab/activos",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        5456,
+        8432
+      ],
+      "id": "89b6b12b-c163-4a3a-b9c8-7d4005a63d73",
+      "name": "W1. Webhook — Consultar Activos para Curaduría",
+      "webhookId": "6919f7f4-297e-43c0-b4b0-5b49d10f267b"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    ag.id_activo,\n    ag.id_lote,\n    ag.tipo_activo,\n    ag.contenido,\n    ag.estado_curaduria,\n    ag.id_version_actual,\n    va.numero_version,\n    va.origen_version,\n    va.motivo_cambio,\n    va.creado_por,\n    va.creado_en AS version_creada_en,\n    ag.id_version_aprobada,\n    ag.comentario_curaduria,\n    ag.revisado_en,\n    ag.creado_en AS activo_creado_en,\n    ag.actualizado_en\nFROM activo_generado ag\nLEFT JOIN version_activo va\n    ON va.id_version = ag.id_version_actual\nWHERE ag.id_lote = $1::BIGINT\nORDER BY ag.tipo_activo ASC, ag.id_activo ASC;",
+        "options": {
+          "queryReplacement": "={{ [$json.id_lote] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        6128,
+        8320
+      ],
+      "id": "c5e09d76-2ce5-42db-bbbc-3e782d9f70d7",
+      "name": "W2. Consultar Activos para Curaduría",
+      "credentials": {
+        "postgres": {
+          "id": "WqrsMGAPtexw6pvx",
+          "name": "Postgres - CommunityLab Local"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "V1. Webhook — Historial de versiones": {
+      "main": [
+        [
+          {
+            "node": "V2. Validar id_activo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V2. Validar id_activo": {
+      "main": [
+        [
+          {
+            "node": "V3. ¿ID válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V3. ¿ID válido?": {
+      "main": [
+        [
+          {
+            "node": "V4. Consultar activo e historial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "V6. Responder ID inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V4. Consultar activo e historial": {
+      "main": [
+        [
+          {
+            "node": "V5. ¿Activo existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "V5. ¿Activo existe?": {
+      "main": [
+        [
+          {
+            "node": "V6. Responder historial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "V7. Responder activo inexistente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W1.2 ¿id_lote válido?": {
+      "main": [
+        [
+          {
+            "node": "W2. Consultar Activos para Curaduría",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "W3.1 Responder solicitud inválida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W1.1 Validar id_lote": {
+      "main": [
+        [
+          {
+            "node": "W1.2 ¿id_lote válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W1. Webhook — Consultar Activos para Curaduría": {
+      "main": [
+        [
+          {
+            "node": "W1.1 Validar id_lote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "W2. Consultar Activos para Curaduría": {
+      "main": [
+        [
+          {
+            "node": "W3. Responder Consulta de Activos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0e027420-3fdd-46a3-b69b-9bac7024e8be",
+  "meta": {
+    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+  },
+  "nodeGroups": [],
+  "id": "g40iimCxVxvk69u2",
+  "tags": []
+}

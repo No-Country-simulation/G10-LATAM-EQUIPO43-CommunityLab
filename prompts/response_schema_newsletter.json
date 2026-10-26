@@ -1,0 +1,62 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "generado",
+        "insuficiente"
+      ]
+    },
+    "titulo": {
+      "type": "string"
+    },
+    "introduccion": {
+      "type": "string"
+    },
+    "secciones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "enum": [
+              "Logro de la Semana",
+              "Tema en Tendencia",
+              "Dato de la Comunidad"
+            ]
+          },
+          "contenido": {
+            "type": "string"
+          },
+          "ids_actividades": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "titulo",
+          "contenido",
+          "ids_actividades"
+        ]
+      }
+    },
+    "cierre": {
+      "type": "string"
+    },
+    "motivo": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "titulo",
+    "introduccion",
+    "secciones",
+    "cierre",
+    "motivo"
+  ]
+}
