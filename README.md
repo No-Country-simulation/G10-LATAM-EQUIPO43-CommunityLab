@@ -1,52 +1,70 @@
 # G10-LATAM-EQUIPO43-CommunityLab
 
-## Descripción del proyecto
-Motor inteligente que transforma la actividad orgánica de una comunidad digital (mensajes, dudas, testimonios) en activos de marketing listos para publicar, usando IA generativa y automatización. Proyecto del Hackathon ONE G10 (Oracle Next Education & Alura).
+## 📌 Descripción del proyecto
+Motor inteligente que transforma la actividad orgánica de una comunidad digital (mensajes, dudas, testimonios en Discord) en activos de marketing listos para publicar, utilizando IA generativa multimodal y automatización de flujos con curaduría humana (*Human-in-the-Loop*). Proyecto oficial del Hackathon ONE G10 (Oracle Next Education & Alura).
 
-## Estado actual
-Sprint 1/5 — Setup inicial completado. Aún sin flujo funcional end-to-end.
+---
 
-## Arquitectura
+## 🚀 Despliegue en Vivo y Entregables
+
+- **🎥 Video Demostración (YouTube):**  
+  👉 [Ver Video Demo en YouTube (4:48 min)](https://youtu.be/t2MH_sulCiY?si=zJZUWs0LZVNBmf9G)
+
+- **🖥️ Panel de Curaduría (Frontend en Streamlit Cloud):**  
+  👉 [https://communitylab-g43.streamlit.app](https://communitylab-g43.streamlit.app)  
+  *(Interfaz interactiva para revisión, edición y aprobación de copys en tiempo real).*
+
+- **⚙️ Orquestación de Flujos (n8n en OCI Compute VM):**  
+  👉 [https://163-176-170-76.sslip.io](https://163-176-170-76.sslip.io)  
+  *(Instancia Canonical Ubuntu 22.04 Always Free en Oracle Cloud - Brazil East).*
+
+- **🪣 Persistencia en la Nube (Always Free):**  
+  👉 **OCI Object Storage:** Bucket `communitylab-activos-marketing` (Namespace `grhxfjzkgrnw`, Región `sa-saopaulo-1`).
+
+---
+
+## 🏆 Estado actual
+**Sprint 5/5 — MVP Funcional End-to-End Completado.**  
+Pipeline de ingesta en tiempo real desde Discord, análisis semántico con Google Gemini (cálculo de sentimiento, tópicos y scores de relevancia), bifurcación hacia activos (LinkedIn, Newsletter, FAQ), panel web de curaduría y persistencia histórica en frío en Oracle Cloud.
+
+---
+
+## 🏗️ Arquitectura del Pipeline
 
 ```mermaid
 flowchart LR
-    A[ACTIVIDAD DE LA COMUNIDAD<br/>Discord/Slack/JSON/CSV] 
-    A --> B[ANÁLISIS E INTELIGENCIA LLM<br/>Gemini/Claude<br/>Sentimiento, temas, historias y relevancia]
-    B --> C[GENERACIÓN DE ACTIVOS<br/>Prompts especializados:<br/>Post LinkedIn + Newsletter/FAQ]
-    C --> D[REVISIÓN Y CURADURÍA<br/>Panel de aprobación en Streamlit]
-    D --> E[DISTRIBUCIÓN Y ALMACENAMIENTO<br/>Publicación/Salida de activos + Persistencia en OCI Object Storage]
+    A[ACTIVIDAD DE LA COMUNIDAD<br/>Bot de Discord en Tiempo Real] 
+    A --> B[ANÁLISIS E INTELIGENCIA LLM<br/>Google Gemini<br/>Sentimiento, relevancia y tópicos]
+    B --> C[GENERACIÓN DE ACTIVOS<br/>Prompts especializados:<br/>Post LinkedIn + Newsletter + FAQ]
+    C --> D[REVISIÓN Y CURADURÍA<br/>Panel interactivo en Streamlit]
+    D --> E[DISTRIBUCIÓN Y PERSISTENCIA<br/>Salida de activos + OCI Object Storage Always Free]
 ```
 
-Flujo general: interacciones (Discord/Slack/JSON/CSV) → análisis con LLM (sentimiento, tema y relevancia) → activos generados (Post LinkedIn + Newsletter/FAQ) → revisión y curaduría (aprobación en Streamlit) → salida y almacenamiento (salida de activos y almacenamiento en OCI Object Storage).
+---
 
-## Flujo de trabajo (Git)
-Recordar no hacer push directo a main, todo por rama + pull requests
 
-## Stack
-- **LLM**: Google Gemini
-- **Orquestación**: N8N (self-hosted en VM OCI)
-- **Almacenamiento**: OCI Object Storage (Always Free)
-- **Interfaz**: Streamlit
-- **Gestión de tareas**: Trello
-- **Comunicación**: Discord
+## 🛠️ Stack Tecnológico
+- **Modelos de Lenguaje (LLM):** Google Gemini 1.5 / 2.0 Flash (vía Google AI Studio API).
+- **Orquestación:** n8n (self-hosted en VM Linux Always Free de OCI con SSL).
+- **Base de Datos Operativa:** PostgreSQL en Supabase (Pooler IPv4 con SSL).
+- **Almacenamiento en la Nube:** OCI Object Storage (Bucket Always Free).
+- **Frontend / UI:** Streamlit (desplegado en Streamlit Community Cloud).
+- **Ingesta:** Discord Bot en Python (`discord.py`).
+- **Control de Versiones:** Git Flow en GitHub con Pull Requests y ramas de features.
 
-## Estructura del repositorio
-```
+---
+
+## 📂 Estructura del repositorio
+```text
 G10-LATAM-EQUIPO43-CommunityLab/
-
-├── frontend/
 ├── backend/
-├── data/
-├── docs/
+│   ├── bot discord n8n/        # Bot de Discord en Python
+│   └── workflows/              # Workflows exportados en JSON para n8n
+├── frontend/
+│   ├── app.py                  # Panel interactivo de curaduría en Streamlit
+│   └── requirements.txt        # Dependencias de Python
+├── data/                       # Datasets de prueba e interacciones simuladas
+├── database/                   # Scripts de migración y esquemas SQL
+├── docs/                       # Documentación técnica, contratos y guías de prompts
 └── README.md
 ```
-
-## Cómo correr el proyecto
-_(se completa a partir del Sprint 2, cuando haya funcionalidad real)_
-
-## Roadmap de sprints
-- **Sprint 1** (setup): repo, Trello, OCI, bucket, JSON simulado, diagrama borrador
-- **Sprint 2**: análisis de sentimiento y temas con Gemini
-- **Sprint 3**: flujo de automatización en N8N con bifurcación condicional
-- **Sprint 4**: integración con OCI Object Storage + interfaz Streamlit
-- **Sprint 5**: demo final, 3 ejemplos, documentación completa
