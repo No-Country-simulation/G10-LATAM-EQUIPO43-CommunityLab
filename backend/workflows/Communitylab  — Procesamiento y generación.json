@@ -1,5 +1,5 @@
 {
-  "name": "Procesamiento y generación - communityLab",
+  "name": "2. Procesamiento y Generación",
   "nodes": [
     {
       "parameters": {
@@ -18,11 +18,13 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        288,
-        704
+        928,
+        1008
       ],
-      "id": "a37e4506-6457-42a7-b48f-254845da1568",
-      "name": "Analista de Contenido (LLM)"
+      "id": "e6a86c49-be87-48b6-8bd8-2b9af44b91b4",
+      "name": "Analista de Contenido (LLM)",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -31,10 +33,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1680,
-        704
+        2320,
+        1008
       ],
-      "id": "1290d3c4-4404-499d-aa0e-22cb60d5aedf",
+      "id": "492e5099-15fd-428b-b1e5-b0173b662fef",
       "name": "Evaluador de Activos (Branching)",
       "executeOnce": false,
       "alwaysOutputData": false
@@ -56,23 +58,25 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        2208,
-        752
+        2848,
+        1056
       ],
-      "id": "a395eb8c-1c90-46a7-81e3-c4c00a483056",
-      "name": "Generador de Post para LinkedIn"
+      "id": "4780824f-2bcb-436f-8b85-866c887f5b4d",
+      "name": "Generador de Post para LinkedIn",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
-        "jsCode": "/**\n * Continuar cuando no hay activos a generar (o para forzar construcción).\n * Emite un item que permite al Merge/Construir cerrar el flujo.\n */\nconst input = $input.first().json;\nconst d = input.decisiones_branching || {};\nconst alguno = d.generar_linkedin || d.generar_newsletter || d.generar_faq;\n\nif (alguno) {\n  // Hay ramas activas: no emitir aquí (las cubren los generadores)\n  return [];\n}\n\n// Ningún activo: emitir marcador para que Construir genere respuesta vacía de activos\nreturn [{\n  json: {\n    status: \"no_requerido\",\n    rama: \"ninguno\",\n    ...input\n  }\n}];\n"
+        "jsCode": "const input = $input.first().json;\nconst d = input.decisiones_branching || {};\n\n// Si hay que generar LinkedIn, esa rama la cubre el generador\nif (d.generar_linkedin) {\n  return [];\n}\n\nreturn [{\n  json: {\n    status: \"no_requerido\",\n    rama: \"ninguno\",\n    ...input\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2160,
-        464
+        2800,
+        768
       ],
-      "id": "a3fe2c6d-c391-46fe-a922-a86e4a46cdc9",
+      "id": "44a61eba-2e97-4a6e-bf78-18522ddd0f65",
       "name": "Sin activos - continuar"
     },
     {
@@ -82,10 +86,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        816,
-        1536
+        1232,
+        1840
       ],
-      "id": "6feda92e-8c6e-454b-bd93-c3b74c9db8ca",
+      "id": "5f2019f3-7ab8-4b6d-a72d-96fcae308d3f",
       "name": "Mock Analista LLM"
     },
     {
@@ -95,10 +99,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3120,
-        768
+        3760,
+        1072
       ],
-      "id": "8a48540b-7d34-4054-ad2b-e7d8ba093dbb",
+      "id": "55d4ece1-3fa3-4a13-bbfb-1f47d5806c4e",
       "name": "Ensamble Paquete Distribución"
     },
     {
@@ -112,18 +116,18 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        864,
-        704
+        1504,
+        1008
       ],
-      "id": "fd225b93-fd6b-40d1-9349-84735c3e33c6",
+      "id": "b1334595-e087-42c7-91cb-fab30de25cb8",
       "name": "W3. Guardar Análisis LLM",
       "alwaysOutputData": false,
       "executeOnce": false,
       "retryOnFail": false,
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -136,40 +140,42 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1040,
-        704
+        1680,
+        1008
       ],
-      "id": "bc67e912-c4c3-44da-bb89-49ffc80d6979",
+      "id": "f66c6ca3-4bb5-4845-8b41-1ecc83df695c",
       "name": "W4. Consolidar Lote en Postgres",
       "executeOnce": false,
       "alwaysOutputData": false,
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH lote AS (\n    SELECT CAST(\n        '{{ $json.id_lote || $(\"Crear Lote de Procesamiento\").first().json.id_lote }}'\n        AS BIGINT\n    ) AS id_lote\n),\nactivos_entrada AS (\n    SELECT\n        l.id_lote,\n        a.tipo_activo,\n        a.contenido\n    FROM lote l\n    CROSS JOIN (\n        VALUES\n            (\n                'LINKEDIN',\n                '{{ JSON.stringify($json.activos_distribucion_generados.post_linkedin || null) }}'::JSONB\n            ),\n            (\n                'FAQ',\n                '{{ JSON.stringify($json.activos_distribucion_generados.sugerencia_contenido_faq || null) }}'::JSONB\n            )\n    ) AS a(tipo_activo, contenido)\n    WHERE a.contenido IS NOT NULL\n      AND a.contenido <> 'null'::JSONB\n      AND a.contenido ->> 'status'\n          IS DISTINCT FROM 'no_requerido'\n)\nINSERT INTO activo_generado (\n    id_lote,\n    tipo_activo,\n    contenido,\n    estado_curaduria,\n    creado_en,\n    actualizado_en\n)\nSELECT\n    e.id_lote,\n    e.tipo_activo,\n    e.contenido,\n    'borrador',\n    NOW(),\n    NOW()\nFROM activos_entrada e\nON CONFLICT (id_lote, tipo_activo) DO NOTHING\nRETURNING\n    id_activo,\n    id_lote,\n    tipo_activo,\n    estado_curaduria,\n    id_version_actual;",
-        "options": {}
+        "query": "WITH activos_entrada AS (\n    SELECT $1::bigint AS id_lote, a.tipo_activo, a.contenido\n    FROM (\n        VALUES\n            ('LINKEDIN', $2::jsonb),\n            ('FAQ',      $3::jsonb)\n    ) AS a(tipo_activo, contenido)\n    WHERE a.contenido IS NOT NULL\n      AND a.contenido <> 'null'::jsonb\n      AND COALESCE(a.contenido ->> 'status', '') NOT IN ('no_requerido', 'omitido')\n)\nINSERT INTO activo_generado (\n    id_lote, tipo_activo, contenido, estado_curaduria, creado_en, actualizado_en\n)\nSELECT e.id_lote, e.tipo_activo, e.contenido, 'borrador', NOW(), NOW()\nFROM activos_entrada e\nON CONFLICT (id_lote, tipo_activo) DO NOTHING\nRETURNING id_activo, id_lote, tipo_activo, estado_curaduria, id_version_actual;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id_lote || $('Crear Lote de Procesamiento').first().json.id_lote, JSON.stringify($json.activos_distribucion_generados.post_linkedin || null), JSON.stringify($json.activos_distribucion_generados.sugerencia_contenido_faq || null) ] }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3360,
-        768
+        4000,
+        1072
       ],
-      "id": "c694bec3-8187-437f-90bb-3841cef986b6",
+      "id": "29ceecfb-320b-43df-97d6-348045409dfa",
       "name": "W5. Guardar Activos Generados",
       "executeOnce": false,
       "alwaysOutputData": false,
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -177,17 +183,20 @@
       "parameters": {
         "rule": {
           "interval": [
-            {}
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
           ]
         }
       },
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.4,
       "position": [
-        -368,
-        704
+        48,
+        1008
       ],
-      "id": "e6223c2c-d015-40f5-b7af-6ec5fd7ef247",
+      "id": "e149642f-8e22-4823-9357-a14dba4305fd",
       "name": "Schedule Trigger"
     },
     {
@@ -199,15 +208,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        64,
-        704
+        704,
+        1008
       ],
-      "id": "4cb618d3-a75a-4276-8e4b-aef3b4587e45",
+      "id": "89ba5973-5e15-4e00-bd81-e7a2a328d23d",
       "name": "Asignar Lote a Actividades Pendientes",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -220,15 +229,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -144,
-        704
+        496,
+        1008
       ],
-      "id": "4134637d-089b-4e86-aee8-b4fc4663d100",
+      "id": "8ffef8e7-ac28-47ad-8370-bc64aac33424",
       "name": "Crear Lote de Procesamiento",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -241,16 +250,16 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1216,
-        704
+        1856,
+        1008
       ],
-      "id": "60c1235c-7dec-450a-907e-2474130b9f42",
+      "id": "c2c7f60b-d93f-42b4-af2d-25dc6efdf873",
       "name": "W4.1. Obtener Actividades Analizadas del Lote",
       "executeOnce": true,
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -261,10 +270,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1440,
-        704
+        2080,
+        1008
       ],
-      "id": "4cb0707a-212d-497e-b310-78a7a27f0547",
+      "id": "34d3cfa5-8d9b-4082-a0fb-427aa8d77d60",
       "name": "W4.2. Consolidar Análisis del Lote"
     },
     {
@@ -274,10 +283,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        624,
-        704
+        1264,
+        1008
       ],
-      "id": "5baa13e9-5145-4ac7-94c7-da6488566f72",
+      "id": "218e5803-633f-4479-b3a9-442b3606574b",
       "name": "Code: Preparar Análisis para W3"
     },
     {
@@ -289,15 +298,15 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        272,
-        928
+        912,
+        1232
       ],
-      "id": "e2fde2a2-65bd-410f-9204-0bf0751c7926",
+      "id": "bd84430d-e76c-41f3-9cc5-d10897767fd8",
       "name": "Google Gemini Chat Model",
       "credentials": {
         "googlePalmApi": {
-          "id": "Jw8oa1tQEtM6ZGSP",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "B3taNTYHxUbVSxWW",
+          "name": "Google Gemini(PaLM) Api account 2"
         }
       }
     },
@@ -308,10 +317,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1104,
-        1552
+        1520,
+        1856
       ],
-      "id": "19763219-154a-435a-af5b-17c559ae785b",
+      "id": "239ad0b6-1393-4164-97c5-d7d2c93ab1d6",
       "name": "Mock Generacion de Activos"
     },
     {
@@ -323,15 +332,15 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        2192,
-        912
+        2832,
+        1216
       ],
-      "id": "c81e4ec2-b29a-4382-9df3-8fa302a69753",
+      "id": "d3e54917-9ac2-47ae-a4f2-c085ac7cb467",
       "name": "Google Gemini Chat Model1",
       "credentials": {
         "googlePalmApi": {
-          "id": "Jw8oa1tQEtM6ZGSP",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "B3taNTYHxUbVSxWW",
+          "name": "Google Gemini(PaLM) Api account 2"
         }
       }
     },
@@ -343,10 +352,10 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        432,
-        912
+        1072,
+        1216
       ],
-      "id": "4a3af356-4b4b-41cd-9f92-6a5011848371",
+      "id": "5fd52d64-d292-4389-bc93-bee42171c268",
       "name": "Structured Output Parser"
     },
     {
@@ -358,15 +367,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3648,
-        768
+        4288,
+        1072
       ],
-      "id": "5821950b-7da2-4387-a331-6b2ef7060b91",
+      "id": "a4786231-aa35-43b9-b203-df8a6a5539fb",
       "name": "W5.2 — Crear la versión inicial",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -379,15 +388,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3872,
-        768
+        4512,
+        1072
       ],
-      "id": "5c886778-351d-489e-b549-6a40ccdd8e82",
+      "id": "00db13a9-ace6-41b9-aa50-b290593dca03",
       "name": "W5.3 — Vincular la versión actual",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -400,15 +409,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4096,
-        768
+        4736,
+        1072
       ],
-      "id": "3a42939d-081c-4960-82ae-26103e4168e2",
+      "id": "dc4f3b2a-9184-4992-bf9b-59910ffb3009",
       "name": "W5.4 — Verificar la persistencia",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -420,26 +429,26 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        2352,
-        960
+        2992,
+        1264
       ],
-      "id": "8f29b043-d3d3-4ba8-8e2a-f4a683612655",
+      "id": "c05c861d-c6fe-49ed-829b-cf2401c7fab1",
       "name": "Structured Output Parser1"
     },
     {
       "parameters": {
         "content": "# 🟨 FASE 1: PROGRAMACIÓN Y PREPARACIÓN DEL LOTE\n\n## Propósito\nIniciar una corrida de procesamiento sobre actividades que ya fueron registradas en PostgreSQL y todavía están pendientes de análisis. Esta versión del workflow no recibe el lote mediante un Webhook: comienza con `Schedule Trigger`.\n\n## Secuencia\n1. `Schedule Trigger` inicia la ejecución según la programación configurada.\n2. `Crear Lote de Procesamiento` registra el lote de trabajo.\n3. `Asignar Lote a Actividades Pendientes` vincula al lote las actividades pendientes que serán procesadas.\n\n## Datos de entrada\n- Actividades previamente almacenadas en la tabla `actividad`.\n- Metadatos de la fuente y configuración del lote, según las consultas SQL de los nodos.\n\n## Resultado / continuidad\nLas actividades seleccionadas quedan asociadas a un lote y se envían al análisis individual mediante `Analista de Contenido (LLM)`.\n\n## Persistencia relacionada\n- `lote_procesamiento`: registro y estado del lote.\n- `actividad`: actividades existentes y su asociación con el lote.\n\n**Fuera del alcance de esta fase:** recepción HTTP, validación de un JSON enviado por un cliente y respuesta HTTP 400. Esas operaciones no forman parte de la ruta activa representada en este archivo.",
         "height": 1408,
-        "width": 640,
+        "width": 820,
         "color": "#271136"
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -416,
-        -304
+        0,
+        0
       ],
       "typeVersion": 1,
-      "id": "0de53802-4862-4117-b0c6-27e00c474b12",
+      "id": "c89a258e-a3ee-4692-b56a-b0574383dd27",
       "name": "Sticky Note"
     },
     {
@@ -451,11 +460,11 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        240,
-        -304
+        880,
+        0
       ],
       "typeVersion": 1,
-      "id": "b0611e19-f1f8-4398-a038-f48f5c250f26",
+      "id": "72f6a627-c1a6-4182-93d8-5823dc9f6e26",
       "name": "Sticky Note1"
     },
     {
@@ -467,27 +476,27 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        1408,
-        -304
+        2048,
+        0
       ],
       "typeVersion": 1,
-      "id": "d614bcb3-0cb3-47f8-b2e8-b1d6e7879660",
+      "id": "6e9efaa0-46f3-4f36-9007-1ec81715ef26",
       "name": "Sticky Note2"
     },
     {
       "parameters": {
         "content": "# 🟪 FASE 4: ENSAMBLE Y PERSISTENCIA DE ACTIVOS EN POSTGRESQL\n\n## Propósito\nTomar el resultado de generación —o la ruta sin activos—, normalizarlo y persistir el activo generado y su primera versión en PostgreSQL.\n\n## Secuencia activa\n1. `Ensamble Paquete Distribución` organiza el resultado del lote y el contenido de LinkedIn cuando existe.\n2. `W5. Guardar Activos Generados` registra el activo lógico en `activo_generado`.\n3. `W5.2 — Crear la versión inicial` inserta el contenido inicial en `version_activo`.\n4. `W5.3 — Vincular la versión actual` vincula la versión creada al activo como versión vigente.\n5. `W5.4 — Verificar la persistencia` comprueba el resultado de las operaciones de persistencia.\n\n## Modelo de datos relacionado\n- `activo_generado`: tipo, contenido y estado de curaduría.\n- `version_activo`: historial de versiones, con `origen_version = 'ia'` para la versión inicial.\n- `lote_procesamiento`: lote al que pertenece el activo.\n\nLos nombres de tipos y campos concretos deben seguir los valores que utilizan las consultas SQL y el objeto construido por el workflow.\n\n## Límite de esta versión\nEste archivo no muestra nodos conectados para subir el paquete a OCI Object Storage ni para responder a un Webhook HTTP. La tabla `almacenamiento_oci` existe en el esquema SQL, pero eso por sí solo no demuestra que este workflow la escriba. Documentar la integración OCI como parte de esta ruta requiere incorporar o verificar los nodos correspondientes.\n\n## Resultado / continuidad\nActivos y versión inicial registrados en PostgreSQL, con verificación posterior de persistencia.",
-        "height": 1392,
-        "width": 1376,
+        "height": 1472,
+        "width": 1552,
         "color": "#2D0B32"
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        2960,
-        -304
+        3600,
+        0
       ],
       "typeVersion": 1,
-      "id": "d34dfdf8-2730-4c3f-9ee5-923a22cefd47",
+      "id": "9f0250dd-ccd4-44bc-b66c-71ea9cab2784",
       "name": "Sticky Note3"
     },
     {
@@ -500,220 +509,94 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -416,
-        1456
+        0,
+        1760
       ],
-      "id": "eadf5bbe-ff2d-4187-84e0-f30f29601b16",
+      "id": "05dc5284-c494-41f8-915a-721307690e5c",
       "name": "Sticky Note - Mocks y Merge"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH atascados AS (\n    UPDATE lote_procesamiento\n    SET estado = 'fallido', actualizado_en = NOW()\n    WHERE estado = 'procesando'\n      AND tipo_operacion IS DISTINCT FROM 'newsletter'\n      AND creado_en < NOW() - INTERVAL '30 minutes'\n    RETURNING id_lote\n)\nUPDATE actividad\nSET estado_procesamiento = 'pendiente', id_lote = NULL\nWHERE estado_procesamiento = 'en_lote'\n  AND id_lote IN (SELECT id_lote FROM atascados);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        272,
+        1008
+      ],
+      "id": "e41e9b62-8767-4190-9a8a-e1987b5cf54e",
+      "name": "Liberar Lotes Atascados",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "748f8cbc-2fab-47cc-aad7-9c6f667b24f8",
+              "leftValue": "={{ $json.decisiones_branching.generar_linkedin }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2544,
+        1008
+      ],
+      "id": "54d27e12-29ce-4690-b61b-6e1350e56447",
+      "name": "¿Generar LinkedIn?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE lote_procesamiento\nSET estado = 'completado', finalizado_en = NOW(), actualizado_en = NOW()\nWHERE id_lote = $1 AND estado = 'procesando';",
+        "options": {
+          "queryReplacement": "={{ [ $('Crear Lote de Procesamiento').first().json.id_lote ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        4000,
+        1296
+      ],
+      "id": "f48f8111-b15a-401c-a23c-35a50e0132cd",
+      "name": "Completar_lote",
+      "executeOnce": false,
+      "credentials": {
+        "postgres": {
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
+        }
+      }
     }
   ],
   "pinData": {
-    "Analista de Contenido (LLM)": [
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Positivo",
-            "tema_categoria": "Otro",
-            "tema_libre": "Inicio de aprendizaje en OCI y LangGraph",
-            "score_relevancia": 3,
-            "tipo_insight": "ninguno",
-            "resumen": "El usuario se presenta a la comunidad tras unirse al servidor y menciona que está comenzando a aprender sobre OCI y LangGraph, solicitando consejos generales.",
-            "cita_extraida": "Estoy empezando con OCI y LangGraph, cualquier tip es bienvenido",
-            "razon_relevancia": "Es un mensaje de presentación y saludo inicial. Aunque identifica tecnologías de interés para la comunidad, no contiene una duda técnica específica ni un testimonio de impacto."
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Latencia en agentes con memoria",
-            "score_relevancia": 8,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante consulta sobre un aumento de latencia observado en agentes con memoria después de diez turnos de interacción en un entorno local.",
-            "cita_extraida": "el agente con memory se pone lento después de 10 turnos",
-            "razon_relevancia": "Plantea un problema técnico específico y medible que permite generar contenido educativo sobre optimización de rendimiento y gestión de memoria en aplicaciones de IA."
-          }
-        },
-        "pairedItem": {
-          "item": 1
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Muy Positivo",
-            "tema_categoria": "Logro Laboral",
-            "tema_libre": "Entrevista técnica sobre agentes y LangGraph",
-            "score_relevancia": 9,
-            "tipo_insight": "testimonio",
-            "resumen": "El estudiante comparte que obtuvo su primera entrevista técnica y pudo explicar con éxito conceptos de LangGraph aprendidos en el módulo de agentes.",
-            "cita_extraida": "¡Logré mi primera entrevista técnica gracias al módulo de agentes!",
-            "razon_relevancia": "Es un testimonio de éxito directo que vincula el contenido específico del curso con una oportunidad laboral real, mencionando tecnologías actuales de alta demanda."
-          }
-        },
-        "pairedItem": {
-          "item": 2
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Positivo",
-            "tema_categoria": "Otro",
-            "tema_libre": "Compartir oferta laboral en IA y Python",
-            "score_relevancia": 6,
-            "tipo_insight": "ninguno",
-            "resumen": "El usuario comparte una vacante remota para una startup de IA dirigida a perfiles mid-level con conocimientos en Python y orquestación de agentes.",
-            "cita_extraida": "startup de AI en remoto busca mid-level con experiencia en Python + orquestación de agentes",
-            "razon_relevancia": "Aunque es una oferta externa, demuestra que la comunidad es un espacio activo de networking y valida la demanda laboral de las tecnologías que se enseñan en la plataforma."
-          }
-        },
-        "pairedItem": {
-          "item": 3
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Diferencia entre StateGraph y MessageGraph",
-            "score_relevancia": 8,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante solicita ejemplos prácticos y casos reales para entender la diferencia y los criterios de elección entre StateGraph y MessageGraph, señalando que la explicación del curso no es suficiente.",
-            "cita_extraida": "no veo un ejemplo claro de cuándo conviene uno u otro",
-            "razon_relevancia": "Identifica un vacío específico en el material educativo y solicita casos de uso reales, lo que permite generar contenido complementario de alto valor."
-          }
-        },
-        "pairedItem": {
-          "item": 4
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Manejo de estado y reducers en grafos",
-            "score_relevancia": 7,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante pregunta cómo mantener el contexto al pasar resultados de herramientas entre nodos y si es necesario configurar un reducer explícito en el estado.",
-            "cita_extraida": "¿Hay que usar un reducer explícito en el state o alcanza con el default?",
-            "razon_relevancia": "Es una duda técnica específica sobre la gestión de estados en flujos de trabajo complejos, lo cual es ideal para generar contenido educativo tipo FAQ o tutoriales técnicos."
-          }
-        },
-        "pairedItem": {
-          "item": 5
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Positivo",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Versioning de schema en Postgres checkpointing",
-            "score_relevancia": 8,
-            "tipo_insight": "ninguno",
-            "resumen": "El usuario comparte un consejo técnico sobre la importancia de versionar el esquema del estado al usar checkpointing en Postgres para evitar que cambios en los campos rompan procesos antiguos.",
-            "cita_extraida": "si usás checkpointing con Postgres, fijate de versionar el schema del state",
-            "razon_relevancia": "Ofrece una solución técnica muy específica y accionable basada en una experiencia real de error, lo cual es ideal para crear contenido educativo de tipo 'mejores prácticas'."
-          }
-        },
-        "pairedItem": {
-          "item": 6
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Despliegue en OCI: Functions vs Compute",
-            "score_relevancia": 8,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El usuario consulta sobre la viabilidad de desplegar un agente en OCI Functions frente a instancias Compute, analizando el balance entre costos y el impacto del cold start en un chatbot.",
-            "cita_extraida": "cold start me preocupa para un chatbot de soporte",
-            "razon_relevancia": "Plantea un dilema técnico real y específico sobre arquitectura cloud y optimización de recursos, lo cual es muy valioso para generar contenido educativo comparativo."
-          }
-        },
-        "pairedItem": {
-          "item": 7
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Duda Técnica",
-            "tema_libre": "Timeout en OCI SDK con Python 3.12 y Object Storage",
-            "score_relevancia": 7,
-            "tipo_insight": "duda_recurrente",
-            "resumen": "El estudiante reporta un error de timeout al subir archivos de gran tamaño a Object Storage utilizando el SDK de OCI en Python 3.12 y solicita una solución alternativa.",
-            "cita_extraida": "al subir un objeto grande a Object Storage me tira timeout aunque el connection pool está ok",
-            "razon_relevancia": "Es una consulta técnica muy específica que involucra versiones recientes de software y un caso de uso avanzado, lo cual es ideal para crear guías de resolución de problemas o contenido especializado."
-          }
-        },
-        "pairedItem": {
-          "item": 8
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Muy Positivo",
-            "tema_categoria": "Feedback de Curso",
-            "tema_libre": "Prompt engineering con outputs estructurados",
-            "score_relevancia": 8,
-            "tipo_insight": "feedback",
-            "resumen": "El estudiante califica como excelente el módulo de prompt engineering y sugiere incluir más ejemplos prácticos de few-shot utilizando esquemas JSON.",
-            "cita_extraida": "me gustaría más ejemplos de few-shot con outputs estructurados (JSON schema)",
-            "razon_relevancia": "Proporciona una sugerencia técnica muy específica y accionable para mejorar el contenido, validando al mismo tiempo la alta calidad del material actual."
-          }
-        },
-        "pairedItem": {
-          "item": 9
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Neutral",
-            "tema_categoria": "Feedback de Curso",
-            "tema_libre": "Sugerencia de lab para evaluación de agentes",
-            "score_relevancia": 8,
-            "tipo_insight": "feedback",
-            "resumen": "El estudiante sugiere ampliar la sección de evaluación de agentes mediante la creación de un laboratorio práctico que utilice datasets pequeños para medir métricas de fidelidad y precisión de herramientas.",
-            "cita_extraida": "Sería genial un lab donde midamos faithfulness y tool accuracy con un dataset chico.",
-            "razon_relevancia": "El mensaje es altamente relevante porque propone una mejora técnica específica y actual, mencionando métricas concretas que pueden transformarse directamente en nuevo contenido educativo."
-          }
-        },
-        "pairedItem": {
-          "item": 10
-        }
-      },
-      {
-        "json": {
-          "output": {
-            "sentimiento": "Muy Positivo",
-            "tema_categoria": "Testimonio de Proyecto",
-            "tema_libre": "Implementación de flujo de onboarding con LangGraph y human-in-the-loop",
-            "score_relevancia": 9,
-            "tipo_insight": "testimonio",
-            "resumen": "El estudiante completó el track de LangGraph y logró construir un flujo de onboarding funcional con human-in-the-loop, destacando su progreso desde no entender grafos hasta la implementación técnica.",
-            "cita_extraida": "armé un flujo de onboarding con human-in-the-loop y funciona",
-            "razon_relevancia": "Es un testimonio de éxito muy específico que destaca una funcionalidad avanzada y el progreso real del alumno, lo cual es ideal para contenido de marketing y validación del curso."
-          }
-        },
-        "pairedItem": {
-          "item": 11
-        }
-      }
-    ],
     "Generador de Post para LinkedIn": [
       {
         "json": {
@@ -761,7 +644,7 @@
             "index": 0
           },
           {
-            "node": "Generador de Post para LinkedIn",
+            "node": "¿Generar LinkedIn?",
             "type": "main",
             "index": 0
           }
@@ -797,13 +680,13 @@
             "node": "W5. Guardar Activos Generados",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Completar_lote",
+            "type": "main",
+            "index": 0
           }
         ]
-      ]
-    },
-    "Mock Analista LLM": {
-      "main": [
-        []
       ]
     },
     "W3. Guardar Análisis LLM": {
@@ -843,7 +726,7 @@
       "main": [
         [
           {
-            "node": "Crear Lote de Procesamiento",
+            "node": "Liberar Lotes Atascados",
             "type": "main",
             "index": 0
           }
@@ -916,11 +799,6 @@
         ]
       ]
     },
-    "Mock Generacion de Activos": {
-      "main": [
-        []
-      ]
-    },
     "Google Gemini Chat Model1": {
       "ai_languageModel": [
         [
@@ -975,19 +853,46 @@
           }
         ]
       ]
+    },
+    "W5.4 — Verificar la persistencia": {
+      "main": [
+        []
+      ]
+    },
+    "Liberar Lotes Atascados": {
+      "main": [
+        [
+          {
+            "node": "Crear Lote de Procesamiento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Generar LinkedIn?": {
+      "main": [
+        [
+          {
+            "node": "Generador de Post para LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "16b0bb1e-8a12-4aea-8358-98a2bc8bec46",
+  "versionId": "80e9af94-2c67-46df-80e1-e8b8ca95b2be",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+    "instanceId": "cd546de4ce458027fb927d9954a78c4fbfb8161ef740386b3d43e435430e781c"
   },
   "nodeGroups": [],
-  "id": "8k3NZjwEAs8FtQyS",
+  "id": "qfiAMVOhIyY0EWrJ",
   "tags": []
 }
