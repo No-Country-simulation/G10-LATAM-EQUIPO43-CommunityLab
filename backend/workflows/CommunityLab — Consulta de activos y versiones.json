@@ -1,5 +1,5 @@
 {
-  "name": "CommunityLab — Consulta de activos y versiones",
+  "name": "4. Consulta de Activos y Versiones",
   "nodes": [
     {
       "parameters": {
@@ -10,10 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        5408,
-        9136
+        688,
+        816
       ],
-      "id": "bc930fb1-d59f-497c-bbbc-0b24b26a1263",
+      "id": "9bda316a-2196-4a5c-89ae-81ec8f570373",
       "name": "V1. Webhook — Historial de versiones",
       "webhookId": "c1111111-1111-4111-8111-111111111111"
     },
@@ -24,10 +24,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5648,
-        9136
+        928,
+        816
       ],
-      "id": "a1b023e7-cfe0-4ea6-9f5f-86b25e61ceb0",
+      "id": "a110559b-4e75-4cda-aae4-3ebc6b44f928",
       "name": "V2. Validar id_activo"
     },
     {
@@ -58,10 +58,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        5856,
-        9136
+        1136,
+        816
       ],
-      "id": "d601a404-a693-4850-a2ef-9e81386790a4",
+      "id": "452187ba-dd58-478b-9aea-4860167276bc",
       "name": "V3. ¿ID válido?"
     },
     {
@@ -75,15 +75,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        6096,
-        9024
+        1376,
+        704
       ],
-      "id": "0917552e-2271-4581-b0e8-4161223701a6",
+      "id": "c629ef4e-2e03-459a-9116-dbede16412c4",
       "name": "V4. Consultar activo e historial",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -115,10 +115,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        6320,
-        9024
+        1600,
+        704
       ],
-      "id": "4bc43542-c92d-48aa-bc0b-cdfe530753df",
+      "id": "aa50298c-4f58-4490-8e4b-63331ab0ec7f",
       "name": "V5. ¿Activo existe?"
     },
     {
@@ -132,10 +132,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        6544,
-        8944
+        1824,
+        624
       ],
-      "id": "ada37c74-435b-4ad6-82d9-94d3b8acbeff",
+      "id": "a0148881-efb5-4cce-984e-37c77897edfb",
       "name": "V6. Responder historial"
     },
     {
@@ -149,11 +149,43 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        6544,
-        9104
+        1824,
+        784
       ],
-      "id": "a3535b0b-826e-438d-9bf9-51dbf9aefe6e",
+      "id": "1b6d188c-ae0d-4952-b68a-128dc1b9a593",
       "name": "V7. Responder activo inexistente"
+    },
+    {
+      "parameters": {
+        "content": "## Consulta del historial de versiones\n\n**Endpoint:** GET /webhook/communitylab/activos/:id_activo/versiones\n\n**Objetivo:** recuperar el activo y todas sus versiones sin modificar datos.\n\n**Respuesta 200:** `activo`, `versiones` ordenadas de más reciente a más antigua y `total_versiones`. Cada versión indica `es_actual` y `es_aprobada`.\n\n**Respuesta 400:** `id_activo` ausente o no positivo/entero.\n\n**Respuesta 404:** el activo no existe.\n\n**Importante:** este endpoint no crea, aprueba ni restaura versiones. La consulta utiliza parámetro SQL `$1`. Probar en entorno de pruebas y verificar que `queryReplacement` sea compatible con la versión del nodo PostgreSQL instalada.",
+        "height": 348,
+        "width": 596,
+        "color": "#0B203C"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        656
+      ],
+      "id": "8398e7b4-c44f-4ad2-8d60-1409bdaa44e7",
+      "name": "DOC — Historial de versiones"
+    },
+    {
+      "parameters": {
+        "content": "## Consulta de activos por lote — contrato y decisiones\n\n**Propósito:** lectura para la interfaz de curaduría. No modifica estados, no crea versiones y no publica activos.\n\n**Entrada:** `GET/POST /communitylab/activos` con `id_lote` en query string. Debe ser un entero positivo.\n\n**Validación:** el nodo Code rechaza valores ausentes, vacíos, no numéricos, decimales, negativos o no seguros. La rama inválida responde `400` con un JSON de error.\n\n**SQL:** usa `$1` y Query Parameters (`queryReplacement`) para evitar interpolar directamente la entrada en el SQL. El lote se filtra siempre por `id_lote`.\n\n**Respuesta válida:** `200` con `{ status, total, activos }`. Si el lote no tiene activos, `activos` es `[]` y `total` es `0`.\n\n**Errores:** configurar/probar el manejo de errores del nodo PostgreSQL para que un fallo inesperado no se presente como una consulta exitosa. `404` es opcional y requiere una consulta adicional para verificar la existencia del lote.\n\n**Pruebas mínimas:** id válido con activos; id válido sin activos; parámetro ausente; texto; decimal; cero/negativo; lote inexistente; error de conexión PostgreSQL.\n\n**Nota:** verifica que tu versión de n8n/Postgres acepte `Query Parameters` como `queryReplacement` en la exportación. Prueba el workflow importado antes de activarlo.",
+        "height": 430,
+        "width": 600,
+        "color": "#0B203C"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "75211a84-aec6-4f18-9ce9-8a1234d5d9af",
+      "name": "DOC — Consulta de activos por lote (decisión de arquitectura)"
     },
     {
       "parameters": {
@@ -166,44 +198,40 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        6096,
-        9248
+        1376,
+        928
       ],
-      "id": "1f58a765-0456-429a-8b0c-84dc269e20a9",
-      "name": "V6. Responder ID inválido"
+      "id": "523b022a-4932-44a4-a935-033345faa6c8",
+      "name": "V8. Responder ID inválido"
     },
     {
       "parameters": {
-        "content": "## Consulta del historial de versiones\n\n**Endpoint:** GET /webhook/communitylab/activos/:id_activo/versiones\n\n**Objetivo:** recuperar el activo y todas sus versiones sin modificar datos.\n\n**Respuesta 200:** `activo`, `versiones` ordenadas de más reciente a más antigua y `total_versiones`. Cada versión indica `es_actual` y `es_aprobada`.\n\n**Respuesta 400:** `id_activo` ausente o no positivo/entero.\n\n**Respuesta 404:** el activo no existe.\n\n**Importante:** este endpoint no crea, aprueba ni restaura versiones. La consulta utiliza parámetro SQL `$1`. Probar en entorno de pruebas y verificar que `queryReplacement` sea compatible con la versión del nodo PostgreSQL instalada.",
-        "height": 348,
-        "width": 596,
-        "color": "#0B203C"
+        "path": "communitylab/activos",
+        "responseMode": "responseNode",
+        "options": {}
       },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
       "position": [
-        4720,
-        8976
+        736,
+        112
       ],
-      "id": "00ab26c4-c94f-42e0-b152-731879e5a1c8",
-      "name": "DOC — Historial de versiones"
+      "id": "6170f3f8-1396-47fe-8b03-94b1e00cb199",
+      "name": "C1. Webhook — Consultar activos",
+      "webhookId": "6919f7f4-297e-43c0-b4b0-5b49d10f267b"
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"status\": \"error\", \"error\": $json.error } }}",
-        "options": {
-          "responseCode": 400
-        }
+        "jsCode": "const raw = $json.query?.id_lote;\nconst value = typeof raw === 'string' ? raw.trim() : raw;\nconst valid = value !== undefined && value !== null && String(value).trim() !== '' && /^\\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) && Number(value) > 0;\nreturn [{ json: valid\n  ? { valid: true, id_lote: String(value).trim() }\n  : { valid: false, statusCode: 400, error: 'id_lote es obligatorio y debe ser un entero positivo.' }\n}];"
       },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        6144,
-        8624
+        976,
+        112
       ],
-      "id": "b36cba6c-4c20-4f00-a2a7-590a3c8b75f0",
-      "name": "W3.1 Responder solicitud inválida"
+      "id": "1619acff-9210-46b0-8ece-f5209021c4d1",
+      "name": "C2. Validar id_lote"
     },
     {
       "parameters": {
@@ -233,73 +261,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        5904,
-        8432
+        1184,
+        112
       ],
-      "id": "278a5c3c-9332-4140-a1b1-52977f59166c",
-      "name": "W1.2 ¿id_lote válido?"
-    },
-    {
-      "parameters": {
-        "jsCode": "const raw = $json.query?.id_lote;\nconst value = typeof raw === 'string' ? raw.trim() : raw;\nconst valid = value !== undefined && value !== null && String(value).trim() !== '' && /^\\d+$/.test(String(value).trim()) && Number.isSafeInteger(Number(value)) && Number(value) > 0;\nreturn [{ json: valid\n  ? { valid: true, id_lote: String(value).trim() }\n  : { valid: false, statusCode: 400, error: 'id_lote es obligatorio y debe ser un entero positivo.' }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5696,
-        8432
-      ],
-      "id": "3b5484ba-8567-484e-92ef-2de5241caee9",
-      "name": "W1.1 Validar id_lote"
-    },
-    {
-      "parameters": {
-        "content": "## Consulta de activos por lote — contrato y decisiones\n\n**Propósito:** lectura para la interfaz de curaduría. No modifica estados, no crea versiones y no publica activos.\n\n**Entrada:** `GET/POST /communitylab/activos` con `id_lote` en query string. Debe ser un entero positivo.\n\n**Validación:** el nodo Code rechaza valores ausentes, vacíos, no numéricos, decimales, negativos o no seguros. La rama inválida responde `400` con un JSON de error.\n\n**SQL:** usa `$1` y Query Parameters (`queryReplacement`) para evitar interpolar directamente la entrada en el SQL. El lote se filtra siempre por `id_lote`.\n\n**Respuesta válida:** `200` con `{ status, total, activos }`. Si el lote no tiene activos, `activos` es `[]` y `total` es `0`.\n\n**Errores:** configurar/probar el manejo de errores del nodo PostgreSQL para que un fallo inesperado no se presente como una consulta exitosa. `404` es opcional y requiere una consulta adicional para verificar la existencia del lote.\n\n**Pruebas mínimas:** id válido con activos; id válido sin activos; parámetro ausente; texto; decimal; cero/negativo; lote inexistente; error de conexión PostgreSQL.\n\n**Nota:** verifica que tu versión de n8n/Postgres acepte `Query Parameters` como `queryReplacement` en la exportación. Prueba el workflow importado antes de activarlo.",
-        "height": 430,
-        "width": 600,
-        "color": "#0B203C"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        4720,
-        8320
-      ],
-      "id": "2d6a17c5-ec7b-411a-baa9-91dc19d3752c",
-      "name": "DOC — Consulta de activos por lote (decisión de arquitectura)"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"status\": \"exito\", \"total\": $input.all().length, \"activos\": $input.all().map(item => item.json) } }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
-      "position": [
-        6352,
-        8320
-      ],
-      "id": "e69e75a7-387c-48b2-aa44-6a284157a1fb",
-      "name": "W3. Responder Consulta de Activos"
-    },
-    {
-      "parameters": {
-        "path": "communitylab/activos",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        5456,
-        8432
-      ],
-      "id": "89b6b12b-c163-4a3a-b9c8-7d4005a63d73",
-      "name": "W1. Webhook — Consultar Activos para Curaduría",
-      "webhookId": "6919f7f4-297e-43c0-b4b0-5b49d10f267b"
+      "id": "afed72f5-0bd1-472b-91b4-f7f9c987e890",
+      "name": "C3. ¿id_lote válido?"
     },
     {
       "parameters": {
@@ -312,17 +278,51 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        6128,
-        8320
+        1408,
+        0
       ],
-      "id": "c5e09d76-2ce5-42db-bbbc-3e782d9f70d7",
-      "name": "W2. Consultar Activos para Curaduría",
+      "id": "15a2ac3e-966f-4956-8a3a-0e1b5e809a7b",
+      "name": "C4. Consultar activos",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"exito\", \"total\": $input.all().length, \"activos\": $input.all().map(item => item.json) } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1632,
+        0
+      ],
+      "id": "a7452d06-bdc9-4cf6-8926-dcfb79361b31",
+      "name": "C5. Responder consulta"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"error\": $json.error } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1424,
+        304
+      ],
+      "id": "8104a232-c84e-4000-8e03-05c815fca314",
+      "name": "C6. Responder solicitud inválida"
     }
   ],
   "pinData": {},
@@ -360,7 +360,7 @@
         ],
         [
           {
-            "node": "V6. Responder ID inválido",
+            "node": "V8. Responder ID inválido",
             "type": "main",
             "index": 0
           }
@@ -396,51 +396,51 @@
         ]
       ]
     },
-    "W1.2 ¿id_lote válido?": {
+    "C1. Webhook — Consultar activos": {
       "main": [
         [
           {
-            "node": "W2. Consultar Activos para Curaduría",
+            "node": "C2. Validar id_lote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C2. Validar id_lote": {
+      "main": [
+        [
+          {
+            "node": "C3. ¿id_lote válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C3. ¿id_lote válido?": {
+      "main": [
+        [
+          {
+            "node": "C4. Consultar activos",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "W3.1 Responder solicitud inválida",
+            "node": "C6. Responder solicitud inválida",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "W1.1 Validar id_lote": {
+    "C4. Consultar activos": {
       "main": [
         [
           {
-            "node": "W1.2 ¿id_lote válido?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W1. Webhook — Consultar Activos para Curaduría": {
-      "main": [
-        [
-          {
-            "node": "W1.1 Validar id_lote",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "W2. Consultar Activos para Curaduría": {
-      "main": [
-        [
-          {
-            "node": "W3. Responder Consulta de Activos",
+            "node": "C5. Responder consulta",
             "type": "main",
             "index": 0
           }
@@ -448,16 +448,16 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "0e027420-3fdd-46a3-b69b-9bac7024e8be",
+  "versionId": "e56dd02c-ae08-4042-9cbf-05fe0b1f212c",
   "meta": {
-    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+    "instanceId": "cd546de4ce458027fb927d9954a78c4fbfb8161ef740386b3d43e435430e781c"
   },
   "nodeGroups": [],
-  "id": "g40iimCxVxvk69u2",
+  "id": "dPDgSucRbzUMF12o",
   "tags": []
 }

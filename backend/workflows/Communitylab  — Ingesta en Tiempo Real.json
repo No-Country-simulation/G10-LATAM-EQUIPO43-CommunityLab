@@ -1,20 +1,19 @@
 {
-  "name": "Ingesta en Tiempo Real - CommunityLab",
+  "name": "1. Ingesta en Tiempo Real",
   "nodes": [
     {
       "parameters": {
         "content": "## 🟨 BLOQUE: INGESTA EN TIEMPO REAL\n\nCapturar interacciones de forma asíncrona, resolver automáticamente la Fuente, Canal y Autor (Upsert), y persistir la actividad en estado 'pendiente' sin requerir un lote activo.",
         "height": 784,
-        "width": 1600,
-        "color": "#223149"
+        "width": 1600
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -1216,
-        -464
+        -80,
+        16
       ],
       "typeVersion": 1,
-      "id": "37ea0c0b-b57f-4f3d-9319-c92595b15346",
+      "id": "bf93a62d-5abb-4fd7-a0e7-7b43394027ff",
       "name": "Sticky Note"
     },
     {
@@ -24,10 +23,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -944,
-        -64
+        272,
+        400
       ],
-      "id": "9a1dbce2-64a8-4fe1-a40a-c8249ed4cb7c",
+      "id": "96fa7545-2fb4-441c-980f-5414648272e1",
       "name": "Validar Payload Entrada"
     },
     {
@@ -57,16 +56,16 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -704,
-        -64
+        512,
+        400
       ],
-      "id": "f37a39fa-2a3b-4544-93eb-0da7deb8f8ed",
+      "id": "31a2cbde-a260-4fe3-be46-c90c42d89470",
       "name": "¿ Payload es Válido ?"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {\n  status: \"error\",\n  errores: ($json.errores || []).map((msg, i) => ({ codigo: \"VALIDACION_\" + (i + 1), mensaje: msg, detalle: null })),\n  resumen_comunidad: null,\n  activos_distribucion_generados: {},\n  almacenamiento_oci: { bucket: null, ruta_objeto: null, status: \"omitido\" },\n  meta: { modo: \"solo_oci\", procesado_en: $now.toISO() }\n} }}",
+        "responseBody": "={{ {\n  status: \"error\",\n  errores: ($json.errores || []).map((msg, i) => ({ codigo: \"VALIDACION_\" + (i + 1), mensaje: msg, detalle: null })),\n  resumen_comunidad: null,\n  activos_distribucion_generados: {},\n  almacenamiento_oci: { bucket: null, ruta_objeto: null, status: \"omitido\" },\n  meta: { modo: \"ingesta\", procesado_en: $now.toISO() }\n} }}",
         "options": {
           "responseCode": 400
         }
@@ -74,10 +73,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        -176,
-        144
+        1040,
+        608
       ],
-      "id": "383e12ce-7169-41c2-82c8-97a3f1d74960",
+      "id": "85e5e685-ee52-42f3-9f91-d092af61db25",
       "name": "Responder Error 400 (Bad Request)"
     },
     {
@@ -90,31 +89,33 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -1152,
-        -48
+        64,
+        400
       ],
-      "id": "209b929f-d272-4f0d-ad7a-1d9c3c9f2e51",
+      "id": "d358e5e6-b6b7-4567-bab4-ee749b6c1f52",
       "name": "Trigger: Webhook Discord",
       "webhookId": "fd6dd057-dc07-46f1-8f3f-84c097682031"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "\nWITH upsert_fuente AS (\n    INSERT INTO fuente (nombre)\n    VALUES (\n        '{{ $json.origen_comunidad.replace(/'/g, \"''\") }}'\n    )\n    ON CONFLICT (nombre)\n    DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_fuente\n),\n\nupsert_canal AS (\n    INSERT INTO canal (\n        id_fuente,\n        identificador_origen,\n        nombre\n    )\n    SELECT\n        f.id_fuente,\n        '{{ $json.canal.identificador_origen }}',\n        '{{ $json.canal.nombre.replace(/'/g, \"''\") }}'\n    FROM upsert_fuente f\n    ON CONFLICT (id_fuente, identificador_origen)\n        WHERE identificador_origen IS NOT NULL\n    DO UPDATE SET\n        nombre = EXCLUDED.nombre\n    RETURNING id_canal, id_fuente\n),\n\nupsert_autor AS (\n    INSERT INTO autor (\n        id_fuente,\n        identificador_origen,\n        nombre\n    )\n    SELECT\n        f.id_fuente,\n        '{{ $json.autor.identificador_origen.replace(/'/g, \"''\") }}',\n        '{{ $json.autor.nombre.replace(/'/g, \"''\") }}'\n    FROM upsert_fuente f\n    ON CONFLICT (id_fuente, identificador_origen)\n        WHERE identificador_origen IS NOT NULL\n    DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_autor, id_fuente\n)\n\nINSERT INTO actividad (\n    id_fuente,\n    id_canal,\n    id_autor,\n    id_lote,\n    identificador_origen,\n    contenido,\n    momento_origen,\n    contexto,\n    estado_procesamiento\n)\nSELECT\n    f.id_fuente,\n    c.id_canal,\n    a.id_autor,\n    NULL,\n    '{{ $json.identificador_origen.replace(/'/g, \"''\") }}',\n    '{{ $json.contenido.replace(/'/g, \"''\") }}',\n    '{{ $json.timestamp_origen }}'::timestamptz,\n\n    jsonb_build_object(\n        'plataforma', 'Discord',\n        'discord_channel_id',\n        '{{ $json.canal.identificador_origen.replace(/'/g, \"''\") }}'\n    ),\n\n    'pendiente'\n\nFROM upsert_fuente f\nJOIN upsert_canal c\n    ON c.id_fuente = f.id_fuente\nJOIN upsert_autor a\n    ON a.id_fuente = f.id_fuente\n\nON CONFLICT (id_fuente, identificador_origen)\n    WHERE identificador_origen IS NOT NULL\nDO UPDATE SET\n    id_canal = EXCLUDED.id_canal,\n    id_autor = EXCLUDED.id_autor,\n    contenido = EXCLUDED.contenido,\n    momento_origen = EXCLUDED.momento_origen,\n    contexto = EXCLUDED.contexto,\n    estado_procesamiento = CASE\n        WHEN actividad.contenido IS DISTINCT FROM EXCLUDED.contenido\n          OR actividad.momento_origen IS DISTINCT FROM EXCLUDED.momento_origen\n        THEN 'pendiente'\n        ELSE actividad.estado_procesamiento\n    END\n\nRETURNING\n    id_actividad,\n    id_lote,\n    identificador_origen,\n    estado_procesamiento,\n    creado_en;\n",
-        "options": {}
+        "query": "WITH upsert_fuente AS (\n    INSERT INTO fuente (nombre) VALUES ($1)\n    ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_fuente\n),\nupsert_canal AS (\n    INSERT INTO canal (id_fuente, identificador_origen, nombre)\n    SELECT f.id_fuente, $2, $3 FROM upsert_fuente f\n    ON CONFLICT (id_fuente, identificador_origen)\n        WHERE identificador_origen IS NOT NULL\n    DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_canal, id_fuente\n),\nupsert_autor AS (\n    INSERT INTO autor (id_fuente, identificador_origen, nombre)\n    SELECT f.id_fuente, $4, $5 FROM upsert_fuente f\n    ON CONFLICT (id_fuente, identificador_origen)\n        WHERE identificador_origen IS NOT NULL\n    DO UPDATE SET nombre = EXCLUDED.nombre\n    RETURNING id_autor, id_fuente\n)\nINSERT INTO actividad (\n    id_fuente, id_canal, id_autor, id_lote, identificador_origen,\n    contenido, momento_origen, contexto, estado_procesamiento\n)\nSELECT\n    f.id_fuente, c.id_canal, a.id_autor, NULL, $6, $7, $8::timestamptz,\n    jsonb_build_object('plataforma', 'Discord', 'discord_channel_id', $2::text),\n    'pendiente'\nFROM upsert_fuente f\nJOIN upsert_canal c ON c.id_fuente = f.id_fuente\nJOIN upsert_autor a ON a.id_fuente = f.id_fuente\nON CONFLICT (id_fuente, identificador_origen)\n    WHERE identificador_origen IS NOT NULL\nDO UPDATE SET\n    id_canal = EXCLUDED.id_canal,\n    id_autor = EXCLUDED.id_autor,\n    contenido = EXCLUDED.contenido,\n    momento_origen = EXCLUDED.momento_origen,\n    contexto = EXCLUDED.contexto,\n    estado_procesamiento = CASE\n        WHEN actividad.contenido IS DISTINCT FROM EXCLUDED.contenido\n          OR actividad.momento_origen IS DISTINCT FROM EXCLUDED.momento_origen\n        THEN 'pendiente'\n        ELSE actividad.estado_procesamiento\n    END\nRETURNING id_actividad, id_lote, identificador_origen, estado_procesamiento, creado_en;",
+        "options": {
+          "queryReplacement": "={{ [ $json.origen_comunidad, $json.canal.identificador_origen, $json.canal.nombre, $json.autor.identificador_origen, $json.autor.nombre, $json.identificador_origen, $json.contenido, $json.timestamp_origen ] }}"
+        }
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -176,
-        -160
+        1040,
+        304
       ],
-      "id": "f1129d0f-a88c-4490-ab70-42dc71307583",
+      "id": "b851e352-4a3b-41f5-831b-ab1e8252ed84",
       "name": "W. Persistencia en Tiempo Real (Actividad Pendiente)",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -127,10 +128,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        48,
-        -160
+        1264,
+        304
       ],
-      "id": "c5b95155-932c-434e-a8f7-83fe2e4b9172",
+      "id": "f528dec0-59e6-4f30-a177-325d2b2a07a2",
       "name": "Respond to Webhook"
     },
     {
@@ -140,60 +141,14 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -416,
-        -160
+        800,
+        304
       ],
-      "id": "d29a43e2-87e7-415f-9451-72c983c61311",
+      "id": "6089187f-be97-4fd1-9a1a-b9a1381109b1",
       "name": "Normalizador de Esquema"
     }
   ],
-  "pinData": {
-    "Trigger: Webhook Discord": [
-      {
-        "json": {
-          "headers": {
-            "host": "metro-cookie-steal-headset.trycloudflare.com",
-            "user-agent": "python-requests/2.34.2",
-            "content-length": "405",
-            "accept": "*/*",
-            "accept-encoding": "gzip",
-            "cdn-loop": "cloudflare; loops=1; subreqs=1",
-            "cf-connecting-ip": "189.28.95.137",
-            "cf-ew-via": "15",
-            "cf-ipcountry": "BO",
-            "cf-ray": "a49aa169b83800eb-SCL",
-            "cf-visitor": "{\"scheme\":\"https\"}",
-            "cf-warp-tag-id": "a821d0d2-6b2e-473d-be1d-79fc3b56c8db",
-            "cf-worker": "trycloudflare.com",
-            "connection": "keep-alive",
-            "content-type": "application/json",
-            "x-forwarded-for": "189.28.95.137",
-            "x-forwarded-proto": "https"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "server_id": "1557212261112745984",
-            "server_name": "Servidor G10 Pruebas",
-            "message_id": "1559379964942483487",
-            "channel_id": "1557976241410150400",
-            "channel_name": "feedback-cursos",
-            "user_id": "1322371657142370345",
-            "username": "roxan_any_77786",
-            "display_name": "Roxana Guzmán",
-            "mention": "<@1322371657142370345>",
-            "message": "mensaje de prueba",
-            "timestamp": "2026-10-13T01:39:15.521000+00:00"
-          },
-          "webhookUrl": "http://localhost:5678/webhook-test/communitylab/actividades",
-          "executionMode": "test"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Validar Payload Entrada": {
       "main": [
@@ -258,16 +213,17 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "b8916ef6-4f51-4ce6-954c-3cb89e933f52",
+  "versionId": "43269927-9301-4ad5-8e95-95d1c6086695",
   "meta": {
-    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cd546de4ce458027fb927d9954a78c4fbfb8161ef740386b3d43e435430e781c"
   },
   "nodeGroups": [],
-  "id": "5ga4bbx3sT1rodpH",
+  "id": "ikAVro51oWa0WCNI",
   "tags": []
 }

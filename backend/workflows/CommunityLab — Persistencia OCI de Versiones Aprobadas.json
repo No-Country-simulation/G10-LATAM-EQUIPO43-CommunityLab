@@ -1,25 +1,6 @@
 {
-  "name": "CommunityLab — Persistencia OCI de Versiones Aprobadas",
+  "name": "6. Persistencia OCI de Versiones Aprobadas",
   "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes"
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [
-        5456,
-        2768
-      ],
-      "id": "5f21fac7-e6d4-485e-8eed-39f8b66715a6",
-      "name": "W1. Disparador — Cada 5 minutos"
-    },
     {
       "parameters": {
         "operation": "executeQuery",
@@ -29,15 +10,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        5696,
-        2768
+        240,
+        192
       ],
-      "id": "09747316-8c71-43db-b37c-a53ce38e23d9",
+      "id": "d34bc839-3bdc-42d6-8131-e7302cf7424c",
       "name": "W2. PostgreSQL — Reclamar pendientes",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -48,10 +29,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        5952,
-        2768
+        496,
+        192
       ],
-      "id": "7fb37138-6e49-4990-81b8-d4d1d2de6cf2",
+      "id": "fc4c5ebb-1446-4e2e-8d98-65259293e85f",
       "name": "W3. Preparar JSON y archivo"
     },
     {
@@ -64,15 +45,15 @@
       "type": "n8n-nodes-base.s3",
       "typeVersion": 1,
       "position": [
-        6208,
-        2768
+        752,
+        192
       ],
-      "id": "6577a81e-2eb6-4eba-9e40-1f69febaa0b1",
+      "id": "302ec5e6-e90d-4c03-9438-339694f793dd",
       "name": "W4. S3 — Subir JSON a OCI",
       "credentials": {
         "s3": {
-          "id": "cRQGdJUTaPd2kbOa",
-          "name": "S3 account"
+          "id": "oqkK4OymHsYqgod5",
+          "name": "S3 account 2"
         }
       },
       "onError": "continueErrorOutput"
@@ -88,15 +69,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        6496,
-        2688
+        1040,
+        112
       ],
-      "id": "eb69a692-5fa0-4491-a20a-80e1dde8fb6e",
+      "id": "696900c6-62a7-4287-b994-176effafc89e",
       "name": "W5. PostgreSQL — Registrar éxito",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -111,15 +92,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        6496,
-        2880
+        1040,
+        304
       ],
-      "id": "52069a1f-cd96-4e65-84da-4a76e524a472",
+      "id": "2bedf7cf-00ef-43e3-bc40-526471dcc02b",
       "name": "W6. PostgreSQL — Registrar fallo y reintento",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -132,26 +113,35 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        5456,
-        2576
+        0,
+        0
       ],
-      "id": "e76faba8-85fb-4425-b4d6-21c30da5b136",
+      "id": "d6d73953-84b7-45b5-8ae2-8df7c76b9085",
       "name": "Nota — Alcance y configuración"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        192
+      ],
+      "id": "e82646c9-29c3-4665-afa5-b9f0399dd58f",
+      "name": "W1. Disparador"
     }
   ],
   "pinData": {},
   "connections": {
-    "W1. Disparador — Cada 5 minutos": {
-      "main": [
-        [
-          {
-            "node": "W2. PostgreSQL — Reclamar pendientes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "W2. PostgreSQL — Reclamar pendientes": {
       "main": [
         [
@@ -191,19 +181,30 @@
           }
         ]
       ]
+    },
+    "W1. Disparador": {
+      "main": [
+        [
+          {
+            "node": "W2. PostgreSQL — Reclamar pendientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "d0068a95-b744-48a6-abce-24c360ce1916",
+  "versionId": "249e7048-d2f6-48c9-97e8-59239125f5d9",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+    "instanceId": "cd546de4ce458027fb927d9954a78c4fbfb8161ef740386b3d43e435430e781c"
   },
   "nodeGroups": [],
-  "id": "dSqSr9TPlB3TXK0m",
+  "id": "NK4xAqBjCzjtGgs0",
   "tags": []
 }

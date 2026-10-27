@@ -1,5 +1,5 @@
 {
-  "name": "Generador Newsletter",
+  "name": "3. Generador de Newsletter",
   "nodes": [
     {
       "parameters": {
@@ -11,10 +11,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -1840,
-        1488
+        80,
+        704
       ],
-      "id": "68b7e2de-fc4f-43f6-9670-78163c5cb5b1",
+      "id": "a7a128e6-a77f-4ca4-bb88-5e42360a7af1",
       "name": "Webhook - Generacion de Newsletter",
       "webhookId": "6aafe9b2-ea4b-4be2-9da2-35f525fb015d"
     },
@@ -25,10 +25,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1616,
-        1488
+        304,
+        704
       ],
-      "id": "478d2a7b-d4ad-403e-8a22-fed444a66a67",
+      "id": "343fb704-b39b-404c-8da7-e35b3ace514f",
       "name": "W2 — Validar solicitud"
     },
     {
@@ -58,10 +58,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1392,
-        1488
+        528,
+        704
       ],
-      "id": "11981839-28e6-48b5-a5c6-efb746d3dc7e",
+      "id": "146e7ad5-258f-4d13-8b85-ac6643741100",
       "name": "If"
     },
     {
@@ -75,10 +75,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1872,
-        1536
+        3792,
+        752
       ],
-      "id": "260db3fd-6f17-45b2-9f1e-9ce5dcef11f7",
+      "id": "59dfe30c-f370-4481-9ba0-1d48b39de825",
       "name": "Respuesta 200"
     },
     {
@@ -92,10 +92,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        -1168,
-        1584
+        752,
+        800
       ],
-      "id": "a0b6d52a-4163-4ee0-abf7-b9f4480d79ab",
+      "id": "10ffe361-1fe3-40b3-80f9-610f23386f63",
       "name": "Respuesta 400 (Bad Request)"
     },
     {
@@ -109,15 +109,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -720,
-        1680
+        1200,
+        896
       ],
-      "id": "22b14d27-c3d7-4be1-9e52-8c00670a00d4",
+      "id": "46e63e63-0502-474e-beb4-7f7eed7f1299",
       "name": "W3 — Consultar actividades analizadas",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -128,10 +128,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -496,
-        1680
+        1424,
+        896
       ],
-      "id": "48c61557-98ea-4adc-95ad-e720b1ac10a4",
+      "id": "8d5e7dd3-5616-484a-888c-1267e9322026",
       "name": "W4 — Evaluar suficiencia y preparar evidencias"
     },
     {
@@ -161,10 +161,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -272,
-        1680
+        1648,
+        896
       ],
-      "id": "475afb22-53c1-4c3d-8e6b-78ed056fe243",
+      "id": "d1dc896c-c1eb-4503-a7f8-08a86dc1624e",
       "name": "W4.1 — ¿Contenido suficiente?"
     },
     {
@@ -178,10 +178,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        304,
-        1824
+        2224,
+        1040
       ],
-      "id": "a5a3b149-ee90-4feb-b519-1f97b3b7b18b",
+      "id": "1b23d210-ba26-4917-b731-6d32626a9757",
       "name": "Respond to Webhook"
     },
     {
@@ -201,11 +201,13 @@
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        -48,
-        1424
+        1872,
+        640
       ],
-      "id": "9458dac6-89e3-42b3-9f00-a916775b616b",
-      "name": "W5. Generador Newsletter"
+      "id": "4c7aef31-703e-4bc2-acd7-1ea5829474cd",
+      "name": "W5. Generador Newsletter",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -214,10 +216,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        528,
-        1536
+        2448,
+        752
       ],
-      "id": "d2b421ab-442c-4221-981a-120b11536ed8",
+      "id": "7cafde49-d4a4-4e4d-83d4-7297058e9dbe",
       "name": "W7 — Validar referencias y preparar persistencia"
     },
     {
@@ -227,10 +229,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        304,
-        1536
+        2224,
+        752
       ],
-      "id": "ee56bc93-eaae-4fed-99e0-5aa3065a8c76",
+      "id": "0e1f4488-ab37-41d9-a741-3e8043b38ac1",
       "name": "W6 — Normalizar newsletter"
     },
     {
@@ -244,15 +246,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        752,
-        1536
+        2672,
+        752
       ],
-      "id": "1484493c-d40d-4b4d-871f-bd4d1aae16bc",
+      "id": "dd6e7ed1-bf87-4659-86ba-0474f1bca65f",
       "name": "W8 — Crear lote editorial",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -267,15 +269,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        976,
-        1536
+        2896,
+        752
       ],
-      "id": "ef18b5f6-b8bf-4eab-9486-e59ac6e8378b",
+      "id": "24006b09-2b2f-4dd4-89c2-552284346e31",
       "name": "W9 — Guardar activo NEWSLETTER",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -290,15 +292,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1200,
-        1536
+        3120,
+        752
       ],
-      "id": "7a603ef8-9a1f-46fe-b361-a0c4100157d3",
+      "id": "59978fb5-0848-497c-85fa-cc8d8d086531",
       "name": "W10 — Crear versión inicial",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -313,15 +315,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1424,
-        1536
+        3344,
+        752
       ],
-      "id": "102ccd29-bfaf-499d-ba85-b1ec6ca587eb",
+      "id": "430e4b0b-b52c-41ab-9a8b-8137ad607cb4",
       "name": "W11 — Vincular versión actual",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -336,15 +338,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1648,
-        1536
+        3568,
+        752
       ],
-      "id": "bda842f7-dd22-4bba-8881-ad3be10d5165",
+      "id": "03e9ac98-fad2-4180-8eab-0c8d1a4442b7",
       "name": "W12 — Recuperar newsletter persistido",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -359,15 +361,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -1168,
-        1392
+        752,
+        608
       ],
-      "id": "c77cbb8d-db77-4e4c-bb8d-09fd7901c994",
+      "id": "f0a8ab66-9abb-4d65-877b-e5cdff0936fb",
       "name": "W2.2 — Reservar lote editorial",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -398,10 +400,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -944,
-        1392
+        976,
+        608
       ],
-      "id": "19c21937-2922-4994-85d8-604a30132a99",
+      "id": "a6e6c919-1518-4edd-9153-c03fbb526fc1",
       "name": "W2.3 — ¿Reserva nueva?"
     },
     {
@@ -431,10 +433,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -720,
-        1296
+        1200,
+        512
       ],
-      "id": "feb24300-6e25-41a8-aed4-2398495d3ff4",
+      "id": "5a944c75-42db-489d-9a64-53b7906c3952",
       "name": "W2.4 — ¿Newsletter ya completado?"
     },
     {
@@ -464,10 +466,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -496,
-        1392
+        1424,
+        608
       ],
-      "id": "04016a28-76ac-4a68-bae7-8828878a3c2c",
+      "id": "4f51ec84-26d6-4e34-bff1-5fda18f02664",
       "name": "W2.5 — ¿Solicitud en proceso?"
     },
     {
@@ -481,10 +483,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        -496,
-        1200
+        1424,
+        416
       ],
-      "id": "5674c6b1-54dc-4279-aa4f-2c89889ed39c",
+      "id": "7742369d-f305-4f55-bb3b-247af08860ba",
       "name": "Respuesta 200 — Newsletter idempotente"
     },
     {
@@ -498,10 +500,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        -272,
-        1296
+        1648,
+        512
       ],
-      "id": "68e4d5e7-5de7-4442-abb5-04e3e622ee1b",
+      "id": "afd4e8aa-c8f2-4932-acb2-d5901734a96e",
       "name": "Respuesta 202 — Solicitud en proceso"
     },
     {
@@ -515,10 +517,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        -272,
-        1488
+        1648,
+        704
       ],
-      "id": "36a42a14-87e1-4dc2-bbe4-b42a6fb3de20",
+      "id": "8aac2386-6796-4244-b26f-f3e6fa5e71df",
       "name": "Respuesta 409 — Solicitud requiere revisión"
     },
     {
@@ -532,15 +534,15 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        16,
-        1824
+        1936,
+        1040
       ],
-      "id": "288216b1-7f92-4f90-abc7-c519a7a13bf4",
+      "id": "465be2c3-9d80-42a6-9948-472be1ec79b2",
       "name": "W4.2 — Marcar lote sin contenido suficiente",
       "credentials": {
         "postgres": {
-          "id": "WqrsMGAPtexw6pvx",
-          "name": "Postgres - CommunityLab Local"
+          "id": "lHnAfK8LuyEyIk1o",
+          "name": "Postgres account 5"
         }
       }
     },
@@ -552,10 +554,10 @@
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        144,
-        1616
+        2064,
+        832
       ],
-      "id": "adfd3efd-8c5d-4f55-b85f-dc02739bba16",
+      "id": "78eee208-32ca-4248-bc0c-6e736d755d67",
       "name": "Structured Output Parser"
     },
     {
@@ -568,10 +570,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -1920,
-        784
+        0,
+        0
       ],
-      "id": "f0f2d443-51be-4063-a27a-c7892db969a1",
+      "id": "f5d15f19-dec0-45b9-ae6d-44fa7c8317ff",
       "name": "STICKY 01 — Entrada y validación"
     },
     {
@@ -584,10 +586,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -1520,
-        784
+        400,
+        0
       ],
-      "id": "0ab13425-7ed9-4960-9137-7e07a0a187eb",
+      "id": "7760f5fa-ac51-4aad-ae96-02343ab0b0b7",
       "name": "STICKY 02 — Reserva e idempotencia"
     },
     {
@@ -600,10 +602,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -784,
-        784
+        1136,
+        0
       ],
-      "id": "1ad6ee4a-4496-408a-8f35-cf6a6e656f01",
+      "id": "fd11defd-4153-462f-ae7f-2b8bd618954b",
       "name": "STICKY 03 — Actividades y suficiencia"
     },
     {
@@ -616,10 +618,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -176,
-        784
+        1744,
+        0
       ],
-      "id": "a84c2949-1017-4426-b0c3-33a4ed793461",
+      "id": "24d916da-3dcd-4933-9310-1151695faa2b",
       "name": "STICKY 04 — Generación y validación editorial"
     },
     {
@@ -632,10 +634,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        688,
-        784
+        2608,
+        0
       ],
-      "id": "6c0de74a-7d56-46a1-87ed-e37821a21471",
+      "id": "64083242-0e16-41b4-9774-4278d6b06735",
       "name": "STICKY 05 — Persistencia y versión"
     },
     {
@@ -648,10 +650,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1552,
-        784
+        3472,
+        0
       ],
-      "id": "05e8c8c4-503e-4ad9-944a-6acb55a9a3b0",
+      "id": "0c7ca9bd-46d9-4547-99ec-98245cec50d8",
       "name": "STICKY 06 — Respuesta desde datos persistidos"
     },
     {
@@ -664,10 +666,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -640,
-        2160
+        1280,
+        1376
       ],
-      "id": "8388d7dc-6b6b-4bce-b96e-7f101f2dbf36",
+      "id": "f7b8f7c3-dee5-4082-9417-aa71b5d67651",
       "name": "STICKY 07 — Rama de contenido insuficiente"
     },
     {
@@ -679,10 +681,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        1888,
-        784
+        3808,
+        0
       ],
-      "id": "08a62df5-d72b-4080-abdd-0b497b295e7e",
+      "id": "840374f7-b12a-4d52-b772-6539fa057bca",
       "name": "STICKY 08 — Contrato de errores y operación"
     },
     {
@@ -694,15 +696,15 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
       "position": [
-        -48,
-        1632
+        1872,
+        848
       ],
-      "id": "0e876b86-1557-46bb-b6eb-ebf438d2fe50",
+      "id": "0c9c5863-9c08-4731-8897-ac88710c706c",
       "name": "Google Gemini Chat Model",
       "credentials": {
         "googlePalmApi": {
-          "id": "Jw8oa1tQEtM6ZGSP",
-          "name": "Google Gemini(PaLM) Api account"
+          "id": "B3taNTYHxUbVSxWW",
+          "name": "Google Gemini(PaLM) Api account 2"
         }
       }
     }
@@ -976,17 +978,16 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "6d933846-9bf1-4830-9e13-db0fbfda3a08",
+  "versionId": "8dbbea72-4d72-4c9a-a1aa-16d073acc71a",
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "ccc5e52c73819f4f9c03cc2755734f03e0963439f7c5480774a1f2a9e490dd5a"
+    "instanceId": "cd546de4ce458027fb927d9954a78c4fbfb8161ef740386b3d43e435430e781c"
   },
   "nodeGroups": [],
-  "id": "sFynr7jW8NZoB62T",
+  "id": "8EwKrruQ3hiTaTug",
   "tags": []
 }
