@@ -103,7 +103,7 @@ DB_CONFIG = {
     "sslmode": os.environ.get("DB_SSLMODE", "require"),
 }
 
-DEFAULT_OCI_BUCKET = "bucket-communitylab-g43"
+DEFAULT_OCI_BUCKET = "communitylab-activos-marketing"
 
 
 def get_connection():
@@ -537,7 +537,7 @@ def seed_datos_demo():
     """
     Inserta un lote de demostración completo (fuente, canales, autores, actividades,
     análisis de Gemini con puntajes/relevancia, lote_procesamiento, 3 activos en borrador
-    y respaldo en almacenamiento_oci apuntando a 'bucket-communitylab-g43').
+    y respaldo en almacenamiento_oci apuntando a 'communitylab-activos-marketing').
     """
     with get_connection() as conn:
         with conn.cursor() as cur:
