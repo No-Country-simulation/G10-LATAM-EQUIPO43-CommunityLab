@@ -1,141 +1,140 @@
-# CommunityLab — Backend
+# Backend — CommunityLab
 
-Backend de CommunityLab para capturar interacciones de Discord, analizarlas con workflows de n8n y generar activos de contenido que pueden revisarse, editarse y aprobarse desde la interfaz de Streamlit ubicada en `frontend/`.
+El backend de CommunityLab captura mensajes de una comunidad digital en Discord, los procesa mediante workflows de n8n y genera activos de contenido para su revisión y distribución. Incluye análisis de sentimiento y relevancia, generación de publicaciones y newsletters, y persistencia de versiones aprobadas en Oracle Cloud Infrastructure (OCI) Object Storage.
 
-## Arquitectura general
-
-```text
-Discord
-  │
-  ▼
-Bot de Discord (Python / bot.py)
-  │ HTTP POST
-  ▼
-1. Ingesta en Tiempo Real
-  │
-  ▼
-PostgreSQL: actividades pendientes
-  │
-  ▼
-2. Procesamiento y generación
-  │
-  ├── Análisis de mensajes mediante LLM
-  ├── Clasificación de sentimiento, tema y relevancia
-  └── Generación de activos
-        │
-        ▼
-   PostgreSQL: activos y versiones
-        │
-        ├── 3. Consulta de activos y versiones
-        ├── 4. Curaduría de Activos
-        ├── 5. Persistencia OCI de Versiones Aprobadas
-        └── 6. Generador Newsletter
-                 │
-                 ▼
-          Frontend (Streamlit)
-          Edición y aprobación
-```
-
-## Estructura del directorio
+## Estructura
 
 ```text
 backend/
 ├── bot discord n8n/
-│   └── bot.py
+│   ├── bot.py
+│   ├── requirements.txt
+│   └── .env                 # configuración local; no subir a Git
 ├── workflows/
-│   ├── Communitylab — Ingesta en Tiempo Real.json
-│   ├── Communitylab — Procesamiento y generación.json
-│   ├── CommunityLab — Consulta de activos y versiones.json
-│   ├── CommunityLab — Curaduría de Activos.json
-│   ├── CommunityLab — Persistencia OCI de Versiones Aprobadas.json
-│   └── Communitylab — Generador Newsletter.json
+│   ├── Ingesta en Tiempo Real - CommunityLab.json
+│   ├── Procesamiento y generación - communityLab.json
+│   └── CommunityLab — Persistencia OCI de Versiones Aprobadas.json
 └── README.md
 ```
 
-Los nombres de los archivos pueden variar ligeramente según cómo se hayan exportado desde n8n. La numeración funcional corresponde a la lista documentada a continuación.
+## Componentes
 
-## Workflows de n8n
+### 1. Bot de Discord (`bot discord n8n/`)
 
-Importa los seis archivos JSON en tu instancia de n8n y configura sus credenciales, variables y conexiones antes de ejecutarlos.
+`bot.py` se conecta a Discord, escucha mensajes en los canales configurados y envía cada mensaje válido al webhook de ingesta de n8n mediante una petición HTTP `POST`.
 
-### 1. Ingesta en Tiempo Real - CommunityLab
+El bot:
+- Ignora sus propios mensajes y los mensajes de otros bots.
+- Escucha únicamente los canales incluidos en `CANALES_PERMITIDOS`.
+- Envía identificadores del servidor, mensaje, canal y autor, junto con el contenido y la fecha del mensaje.
+- Selecciona el webhook de prueba o producción según la configuración de entorno.
 
-Recibe los mensajes enviados por el bot de Discord mediante un webhook (`communitylab/actividades`). Valida los campos requeridos, normaliza la información de la fuente, canal y autor, y guarda la actividad en PostgreSQL con estado `pendiente`.
+`requirements.txt` contiene las dependencias de Python:
+- `discord.py`
+- `requests`
+- `python-dotenv`
 
-### 2. Procesamiento y generación - communityLab
+### 2. Workflows de n8n (`workflows/`)
 
-Analiza las actividades almacenadas mediante un modelo de lenguaje (LLM). Clasifica cada interacción por sentimiento, tema, relevancia y tipo de insight; después decide qué activos generar, por ejemplo publicaciones de LinkedIn, contenido para newsletter o FAQ, según las evidencias y opciones de la solicitud.
+| Workflow | Función |
+|---|---|
+| **Ingesta en Tiempo Real - CommunityLab** | Recibe los mensajes enviados por el bot, valida los campos obligatorios, normaliza los datos y registra la actividad en PostgreSQL con estado pendiente. |
+| **Procesamiento y generación - communityLab** | Analiza las interacciones mediante un LLM, identifica sentimiento, temas, relevancia y tipo de insight, y decide qué activos generar según las evidencias disponibles. Puede generar contenido para LinkedIn, newsletter y FAQ/tips. |
+| **CommunityLab — Persistencia OCI de Versiones Aprobadas** | Cada cinco minutos revisa la cola de persistencia en PostgreSQL, prepara un JSON por versión aprobada y lo sube a OCI Object Storage mediante una conexión compatible con S3. Registra el éxito o los errores y programa reintentos. |
 
-### 3. CommunityLab — Consulta de activos y versiones
+## Flujo general
 
-Expone endpoints para consultar activos y su historial de versiones. Permite recuperar el contenido actual y revisar qué versión está marcada como actual o aprobada. Es un workflow de consulta: no crea ni modifica versiones.
+```text
+Discord
+   │
+   ▼
+bot.py (Python)
+   │ POST del mensaje
+   ▼
+Webhook de n8n
+   │
+   ▼
+1. Ingesta en tiempo real
+   │
+   ▼
+PostgreSQL: actividades pendientes
+   │
+   ▼
+2. Procesamiento y generación
+   ├── Análisis de sentimiento, temas y relevancia
+   ├── Clasificación de insights
+   └── Generación de activos
+          │
+          ▼
+     Curaduría / aprobación
+          │
+          ▼
+PostgreSQL: versión aprobada y cola OCI
+          │
+          ▼
+3. Persistencia OCI de versiones aprobadas
+          │
+          ▼
+OCI Object Storage
+```
 
-### 4. CommunityLab — Curaduría de Activos
+La revisión y aprobación de activos se realiza desde el frontend del proyecto. La persistencia OCI procesa versiones que ya han sido aprobadas y registradas en la cola correspondiente.
 
-Expone endpoints para las operaciones de curaduría, como editar un activo, registrar una nueva versión, aprobarlo o rechazarlo. Las operaciones validan la solicitud y el estado del activo, y devuelven respuestas HTTP con el resultado.
+## Requisito imprescindible: bot de Discord en ejecución
 
-### 5. CommunityLab — Persistencia OCI de Versiones Aprobadas
+**Para que la ingesta ocurra en tiempo real, el bot de Discord debe estar creado, configurado y ejecutándose con `bot.py`.** Importar o activar el workflow de n8n por sí solo no permite escuchar mensajes de Discord: el bot es el componente que recibe los eventos y los envía al webhook.
 
-Se ejecuta de forma programada para procesar registros pendientes de almacenamiento. Prepara un archivo JSON por versión, lo sube a un bucket compatible con S3 en Oracle Cloud Infrastructure (OCI) y registra el resultado en PostgreSQL. Contempla errores y reintentos.
+Antes de iniciar el bot:
 
-### 6. Generador Newsletter
+1. Crea una aplicación y un bot en el [Discord Developer Portal](https://discord.com/developers/applications).
+2. Invita el bot al servidor de Discord y concédele acceso a los canales que quieres escuchar.
+3. Habilita **Message Content Intent** en el portal de Discord, ya que `bot.py` lee el contenido de los mensajes.
+4. Configura el token, el entorno de n8n y los IDs de los canales en el archivo `.env`.
+5. Importa y configura los workflows de n8n, especialmente el webhook de ingesta y las credenciales de PostgreSQL.
+6. Ejecuta `bot.py` y comprueba en la consola que aparezca el mensaje de conexión.
 
-Recibe una solicitud HTTP para generar un newsletter a partir de actividades analizadas dentro de un intervalo temporal. Valida el origen, las fechas y las opciones; consulta las actividades relevantes y persiste el activo generado. Incluye validación de la solicitud y respuestas de éxito o error.
-
-## Requisito previo: crear el bot de Discord
-
-Antes de ejecutar `bot.py`, crea y configura una aplicación con bot en el [Discord Developer Portal](https://discord.com/developers/applications). El token se obtiene desde la configuración del bot y se utiliza para autenticar la conexión de Python con Discord.
-
-1. Crea una aplicación en el portal de desarrolladores de Discord.
-2. En la sección **Bot**, añade/configura el bot y copia su token.
-3. Habilita **Message Content Intent** si el bot necesita leer el contenido de los mensajes.
-4. Invita el bot al servidor de Discord que se utilizará, concediéndole acceso al servidor y permisos de lectura de los canales correspondientes.
-5. Asegúrate de que el bot tenga acceso al canal o canales que quieres escuchar.
-6. Guarda el token como variable de entorno. **No lo publiques ni lo subas al repositorio.**
-
-Crear el bot no basta por sí solo: también debe estar invitado al servidor y tener permisos para ver los canales y leer los mensajes necesarios.
-
-## Configuración del bot de Python
+## Configuración del bot
 
 ### Requisitos
 
 - Python instalado.
-- Token de un bot de Discord con acceso al servidor y a los canales.
-- Instancia de n8n accesible desde el entorno donde corre el bot.
-- Workflow **1. Ingesta en Tiempo Real - CommunityLab** importado y configurado.
+- Bot de Discord creado e invitado al servidor.
+- Instancia de n8n accesible desde el equipo donde corre el bot.
+- Workflow de ingesta importado y configurado.
+- Acceso a PostgreSQL y credenciales configuradas en n8n.
 
 ### Instalar dependencias
 
-Desde el directorio que contiene `bot.py`, crea y activa un entorno virtual:
+Abre una terminal en `backend/bot discord n8n/`:
 
 ```bash
 python -m venv .venv
 ```
 
-Linux/macOS:
+Activa el entorno virtual.
 
+**Linux/macOS**
 ```bash
 source .venv/bin/activate
 ```
 
-Windows PowerShell:
-
+**Windows PowerShell**
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
 
-Instala las dependencias usadas por el bot:
+Instala las dependencias:
 
 ```bash
-pip install discord.py requests python-dotenv
+pip install -r requirements.txt
 ```
 
 ### Variables de entorno
 
-Crea un archivo `.env` junto a `bot.py` y adapta los valores a la configuración real del proyecto:
+Crea un archivo `.env` dentro de `backend/bot discord n8n/`:
 
 ```dotenv
-DISCORD_TOKEN=pega_aqui_el_token_del_bot
+DISCORD_TOKEN=tu_token_del_bot
 N8N_ENV=test
 N8N_HOST=http://localhost:5678
 N8N_ENDPOINT_TEST=/webhook-test/communitylab/actividades
@@ -143,55 +142,48 @@ N8N_ENDPOINT_PROD=/webhook/communitylab/actividades
 CANALES_PERMITIDOS=ID_CANAL_1,ID_CANAL_2
 ```
 
-- `DISCORD_TOKEN`: token privado del bot.
-- `N8N_ENV`: entorno de n8n que utilizará el bot (`test` o `prod`).
-- `N8N_HOST`: dirección base de la instancia de n8n.
-- `N8N_ENDPOINT_TEST`: ruta del webhook de prueba.
-- `N8N_ENDPOINT_PROD`: ruta del webhook de producción.
-- `CANALES_PERMITIDOS`: IDs de los canales de Discord que se escucharán, separados por comas.
+| Variable | Descripción |
+|---|---|
+| `DISCORD_TOKEN` | Token privado del bot de Discord. |
+| `N8N_ENV` | Entorno seleccionado: `test` o `prod`. |
+| `N8N_HOST` | URL base de la instancia de n8n. |
+| `N8N_ENDPOINT_TEST` | Ruta del webhook de prueba. |
+| `N8N_ENDPOINT_PROD` | Ruta del webhook de producción. |
+| `CANALES_PERMITIDOS` | IDs de los canales que el bot debe escuchar, separados por comas. |
 
-Comprueba los nombres exactos de las variables que lee `bot.py` y las rutas configuradas en n8n. Los valores anteriores son una plantilla: deben coincidir con la implementación y la instancia desplegada. En n8n, las URLs de prueba y producción pueden ser distintas; el webhook de producción requiere que el workflow esté activo.
+Las variables y rutas deben coincidir con la configuración de n8n. En modo prueba, utiliza el webhook de test y ejecuta el workflow de la forma requerida por n8n. En producción, activa el workflow y usa el endpoint de producción.
 
 ### Ejecutar el bot
+
+Desde `backend/bot discord n8n/`, con el entorno virtual activo y `.env` configurado:
 
 ```bash
 python bot.py
 ```
 
-Comprueba en la consola que el bot se conecte a Discord y revisa las ejecuciones del workflow de ingesta en n8n para verificar que los mensajes llegan correctamente.
+Mantén el proceso en ejecución mientras quieras que el bot escuche mensajes. Si se detiene, la ingesta en tiempo real desde Discord deja de funcionar.
 
-## Dependencias e infraestructura
+## Configuración de n8n
 
-- **Discord:** origen de las interacciones comunitarias.
-- **Python / discord.py:** cliente que escucha los mensajes.
-- **Requests:** envío HTTP desde el bot hacia n8n.
-- **python-dotenv:** lectura de variables de entorno.
-- **n8n:** orquestación de ingesta, análisis, generación, curaduría y persistencia.
-- **PostgreSQL:** almacenamiento de actividades, análisis, activos, versiones y estados de procesamiento.
-- **LLM:** análisis semántico y generación de contenido en el workflow de procesamiento.
-- **Streamlit:** interfaz de revisión, edición y aprobación en `Frontend/`.
-- **Oracle Cloud Infrastructure (OCI):** almacenamiento de versiones aprobadas mediante la integración compatible con S3.
-
-## Puesta en marcha de n8n
-
-1. Importa los seis workflows JSON.
-2. Configura las credenciales de PostgreSQL utilizadas por los nodos correspondientes.
-3. Configura las credenciales del proveedor LLM requerido por el workflow 2.
-4. Configura las credenciales de OCI/S3 y verifica el bucket utilizado por el workflow 5.
-5. Comprueba los paths de los webhooks y las URLs que utiliza el frontend y el bot.
-6. Activa los workflows que deban atender solicitudes en producción. El workflow 5 necesita además su disparador programado.
-7. Verifica que el esquema y las funciones de PostgreSQL requeridas por los workflows existan en la base de datos de destino.
-8. Prueba primero la ingesta y consulta los registros en PostgreSQL antes de comprobar el ciclo de generación y curaduría desde Streamlit.
+1. Importa los tres archivos JSON de `workflows/` en tu instancia de n8n.
+2. Configura las credenciales de PostgreSQL para los workflows que acceden a la base de datos.
+3. Configura las credenciales del proveedor LLM utilizadas por el workflow de procesamiento.
+4. Configura las credenciales de OCI Object Storage mediante la integración S3 compatible y verifica el bucket esperado.
+5. Comprueba las rutas de webhook y la URL que utiliza el bot.
+6. Activa los workflows que deban ejecutarse en producción. La persistencia OCI tiene un disparador programado cada cinco minutos.
+7. Verifica que el esquema SQL requerido esté instalado desde los scripts de `database/`.
 
 ## Seguridad
 
-- Añade `.env` a `.gitignore`.
-- No incluyas tokens de Discord, contraseñas, claves API ni credenciales de OCI en Git.
-- Limita los permisos del bot a los servidores y canales necesarios.
-- No expongas públicamente los webhooks de n8n sin controles de acceso apropiados.
-- Separa los endpoints de prueba y producción.
-- Revisa las credenciales y los permisos de la base de datos y del bucket de OCI antes del despliegue.
+- No subas el archivo `.env` al repositorio.
+- Nunca publiques `DISCORD_TOKEN`, claves de proveedores LLM ni credenciales de PostgreSQL/OCI.
+- Añade `.env` y el entorno virtual `.venv/` a `.gitignore`.
+- Concede al bot solo los permisos de Discord que necesita.
+- No expongas los webhooks de n8n sin controles de acceso adecuados.
 
-## Alcance
+## Relación con el resto del proyecto
 
-Este directorio contiene el bot de ingesta y los workflows de n8n. La interfaz para revisar, editar y aprobar activos se encuentra en `frontend/`. La generación de contenido no implica que las publicaciones se publiquen automáticamente en LinkedIn: los activos se preparan para el proceso de revisión y aprobación definido por la aplicación.
+- `frontend/`: panel Streamlit para consultar, editar y aprobar activos.
+- `database/`: esquemas y scripts SQL requeridos por los workflows.
+- `data/`: datasets y casos de prueba.
+- `docs/`: contrato de datos, diagramas y guías técnicas.
