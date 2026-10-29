@@ -586,8 +586,8 @@ def fetch_almacenamiento_oci():
     incluye id_almacenamiento, bucket, ruta_objeto, status y fecha de guardado.
     """
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
+        with conn.cursor() as cur_check:
+            cur_check.execute(
                 """
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.columns
@@ -597,9 +597,9 @@ def fetch_almacenamiento_oci():
                 );
                 """
             )
-            has_id_version = cur.fetchone()[0]
+            has_id_version = cur_check.fetchone()[0]
 
-            cur.execute(
+            cur_check.execute(
                 """
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.columns
@@ -609,63 +609,65 @@ def fetch_almacenamiento_oci():
                 );
                 """
             )
-            has_guardado_en = cur.fetchone()[0]
-            expr_fecha = (
-                "COALESCE(ao.guardado_en, ao.actualizado_en, ao.creado_en)"
-                if has_guardado_en
-                else "COALESCE(ao.actualizado_en, ao.creado_en)"
-            )
+            has_guardado_en = cur_check.fetchone()[0]
 
-            if has_id_version:
-                query = f"""
-                    SELECT
-                        ao.id_almacenamiento,
-                        COALESCE(ag.id_lote, ao.id_lote) AS id_lote,
-                        ag.id_activo,
-                        ag.tipo_activo,
-                        va.id_version,
-                        va.numero_version,
-                        ao.bucket,
-                        ao.ruta_objeto,
-                        ao.status,
-                        {expr_fecha} AS fecha_guardado,
-                        ao.detalle_error,
-                        ao.creado_en,
-                        ao.actualizado_en,
-                        lp.periodo_referencia,
-                        lp.estado AS estado_lote,
-                        lp.total_interacciones,
-                        lp.sentimiento_predominante,
-                        f.nombre AS origen_comunidad
-                    FROM almacenamiento_oci ao
-                    LEFT JOIN version_activo va ON va.id_version = ao.id_version
-                    LEFT JOIN activo_generado ag ON ag.id_activo = va.id_activo
-                    LEFT JOIN lote_procesamiento lp ON lp.id_lote = COALESCE(ag.id_lote, ao.id_lote)
-                    LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
-                    ORDER BY ao.id_almacenamiento DESC;
-                """
-            else:
-                query = f"""
-                    SELECT
-                        ao.id_almacenamiento,
-                        ao.id_lote,
-                        ao.bucket,
-                        ao.ruta_objeto,
-                        ao.status,
-                        {expr_fecha} AS fecha_guardado,
-                        ao.detalle_error,
-                        ao.creado_en,
-                        ao.actualizado_en,
-                        lp.periodo_referencia,
-                        lp.estado AS estado_lote,
-                        lp.total_interacciones,
-                        lp.sentimiento_predominante,
-                        f.nombre AS origen_comunidad
-                    FROM almacenamiento_oci ao
-                    LEFT JOIN lote_procesamiento lp ON lp.id_lote = ao.id_lote
-                    LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
-                    ORDER BY ao.id_almacenamiento DESC;
-                """
+        expr_fecha = (
+            "COALESCE(ao.guardado_en, ao.actualizado_en, ao.creado_en)"
+            if has_guardado_en
+            else "COALESCE(ao.actualizado_en, ao.creado_en)"
+        )
+
+        if has_id_version:
+            query = f"""
+                SELECT
+                    ao.id_almacenamiento,
+                    COALESCE(ag.id_lote, ao.id_lote) AS id_lote,
+                    ag.id_activo,
+                    ag.tipo_activo,
+                    va.id_version,
+                    va.numero_version,
+                    ao.bucket,
+                    ao.ruta_objeto,
+                    ao.status,
+                    {expr_fecha} AS fecha_guardado,
+                    ao.detalle_error,
+                    ao.creado_en,
+                    ao.actualizado_en,
+                    lp.periodo_referencia,
+                    lp.estado AS estado_lote,
+                    lp.total_interacciones,
+                    lp.sentimiento_predominante,
+                    f.nombre AS origen_comunidad
+                FROM almacenamiento_oci ao
+                LEFT JOIN version_activo va ON va.id_version = ao.id_version
+                LEFT JOIN activo_generado ag ON ag.id_activo = va.id_activo
+                LEFT JOIN lote_procesamiento lp ON lp.id_lote = COALESCE(ag.id_lote, ao.id_lote)
+                LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
+                ORDER BY ao.id_almacenamiento DESC;
+            """
+        else:
+            query = f"""
+                SELECT
+                    ao.id_almacenamiento,
+                    ao.id_lote,
+                    ao.bucket,
+                    ao.ruta_objeto,
+                    ao.status,
+                    {expr_fecha} AS fecha_guardado,
+                    ao.detalle_error,
+                    ao.creado_en,
+                    ao.actualizado_en,
+                    lp.periodo_referencia,
+                    lp.estado AS estado_lote,
+                    lp.total_interacciones,
+                    lp.sentimiento_predominante,
+                    f.nombre AS origen_comunidad
+                FROM almacenamiento_oci ao
+                LEFT JOIN lote_procesamiento lp ON lp.id_lote = ao.id_lote
+                LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
+                ORDER BY ao.id_almacenamiento DESC;
+            """
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(query)
             return cur.fetchall()
 
@@ -1522,10 +1524,15 @@ with tab_oci:
 
     try:
         registros_oci = fetch_almacenamiento_oci() or []
-        paquetes_guardados_count = fetch_count_guardados_oci()
     except Exception:
         registros_oci = []
-        paquetes_guardados_count = 0
+
+    try:
+        paquetes_guardados_count = fetch_count_guardados_oci()
+    except Exception:
+        paquetes_guardados_count = len(
+            [r for r in registros_oci if r.get("status") == "guardado_con_exito"]
+        )
 
     ultimo_path = (
         registros_oci[0].get("ruta_objeto")
