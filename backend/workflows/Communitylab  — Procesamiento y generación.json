@@ -68,38 +68,12 @@
     },
     {
       "parameters": {
-        "jsCode": "const input = $input.first().json;\nconst d = input.decisiones_branching || {};\n\n// Si hay que generar LinkedIn, esa rama la cubre el generador\nif (d.generar_linkedin) {\n  return [];\n}\n\nreturn [{\n  json: {\n    status: \"no_requerido\",\n    rama: \"ninguno\",\n    ...input\n  }\n}];\n"
+        "jsCode": "/**\n * ENSAMBLE PAQUETE DISTRIBUCIÓN — CommunityLab / LinkedIn Prompt V2\n * Acepta salida estructurada directa, wrapper {output: ...},\n * texto JSON en `text`, o arrays de wrappers como los mostrados en pruebas.\n */\nconst contextoBase = $('W4.2. Consolidar Análisis del Lote').first()?.json || {};\n// Entrada directa (FAQ, post de LinkedIn o datos del evaluador)\nconst itemsEntrada = [...$input.all()];\n\n// Si en este lote se generó un post de LinkedIn, sumarlo también\ntry {\n  itemsEntrada.push(...$('Generador de Post para LinkedIn').all());\n} catch (e) {\n  // El generador no se ejecutó en este lote: no hay post\n}\n\nfunction parseJsonString(value) {\n  if (typeof value !== 'string') return value;\n  const trimmed = value.trim();\n  if (!trimmed) return value;\n  try { return JSON.parse(trimmed); } catch (_) { return value; }\n}\n\nfunction unwrap(value, depth = 0) {\n  if (depth > 6 || value == null) return value;\n  let current = parseJsonString(value);\n  if (Array.isArray(current)) {\n    if (current.length === 1) return unwrap(current[0], depth + 1);\n    return current.map(v => unwrap(v, depth + 1));\n  }\n  if (current && typeof current === 'object') {\n    if (current.output !== undefined) return unwrap(current.output, depth + 1);\n    if (current.result !== undefined && Object.keys(current).length <= 3) return unwrap(current.result, depth + 1);\n    if (current.response !== undefined && Object.keys(current).length <= 3) return unwrap(current.response, depth + 1);\n    if (current.text !== undefined && !current.titulo && !current.copy) {\n      const parsedText = parseJsonString(current.text);\n      if (parsedText !== current.text) return unwrap(parsedText, depth + 1);\n    }\n  }\n  return current;\n}\n\nfunction isLinkedInAsset(value) {\n  if (!value || typeof value !== 'object') return false;\n  // Un FAQ/Tip trae tema o contenido_sugerido: nunca es LinkedIn\n  if ('tema' in value || 'contenido_sugerido' in value) return false;\n  return 'titulo' in value || 'copy' in value || 'tipo_experiencia' in value || 'omitido' in value;\n}\n\nfunction normalizeLinkedIn(value) {\n  if (!isLinkedInAsset(value)) return null;\n  const asset = {\n    titulo: typeof value.titulo === 'string' ? value.titulo : '',\n    copy: typeof value.copy === 'string' ? value.copy : '',\n    canal_recomendado: value.canal_recomendado || 'LinkedIn Oficial',\n    potencial_engagement: ['Alto', 'Medio', 'Bajo'].includes(value.potencial_engagement) ? value.potencial_engagement : 'Bajo',\n    hashtags: Array.isArray(value.hashtags) ? value.hashtags : [],\n    origen_interacciones: Array.isArray(value.origen_interacciones) ? value.origen_interacciones : [],\n    tipo_experiencia: value.tipo_experiencia || null\n  };\n  if (value.omitido === true) {\n    asset.omitido = true;\n    asset.motivo = typeof value.motivo === 'string' ? value.motivo : 'No hay material utilizable para redactar un post fiel.';\n  }\n  return asset;\n}\n\nlet postLinkedin = { status: 'no_requerido' };\nlet sugerenciaFAQ = { status: 'no_requerido' };\n\nfor (const item of itemsEntrada) {\n  const datosOriginales = item?.json ?? {};\n  const datos = unwrap(datosOriginales);\n  const candidatos = Array.isArray(datos) ? datos : [datos];\n  for (const candidato of candidatos) {\n    const linkedin = normalizeLinkedIn(candidato);\n    if (linkedin) {\n      postLinkedin = linkedin.omitido\n        ? { ...linkedin, status: 'omitido' }\n        : linkedin;\n    } else if (candidato && typeof candidato === 'object' && (\n      'tema' in candidato || 'contenido_sugerido' in candidato || 'origen' in candidato\n    )) {\n      sugerenciaFAQ = candidato;\n    }\n  }\n}\n\nconst fechaISO = new Date().toISOString();\nconst timestamp = fechaISO.replace(/[:.-]/g, '');\nconst periodoRef = String(contextoBase.periodo_referencia || 'semana_actual').toLowerCase().replace(/\\s+/g, '_');\nconst rutaObjetoOCI = `activos/${periodoRef}/paquete-${timestamp}.json`;\nconst activos = {};\n// Se conserva el activo omitido en el paquete para dejar trazabilidad, pero se excluye de la curaduría/BD.\nif (postLinkedin.status !== 'no_requerido' || postLinkedin.omitido === true) activos.post_linkedin = postLinkedin;\nif (sugerenciaFAQ.status !== 'no_requerido') activos.sugerencia_contenido_faq = sugerenciaFAQ;\n\nconst paqueteFinal = {\n  status: 'exito',\n  id_lote: contextoBase.id_lote ?? null,\n  origen_comunidad: contextoBase.origen_comunidad || 'Comunidad_General',\n  periodo_referencia: contextoBase.periodo_referencia || 'Semana_Actual',\n  resumen_comunidad: contextoBase.resumen_comunidad || {},\n  activos_distribucion_generados: activos,\n  meta: {\n    procesado_en: fechaISO,\n    modo: 'solo_oci',\n    workflow_execution_id: $execution.id || 'ejecucion_local'\n  }\n};\nreturn [{ json: paqueteFinal }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2800,
-        768
-      ],
-      "id": "44a61eba-2e97-4a6e-bf78-18522ddd0f65",
-      "name": "Sin activos - continuar"
-    },
-    {
-      "parameters": {
-        "jsCode": "\n/**\n * MOCK DE PRUEBA\n * Simula la salida del Analista LLM.\n * Mantiene los datos de entrada y devuelve el contrato esperado.\n */\n\nconst items = $input.all();\n\nconst temasEjemplo = [\n  [\"Logros y empleos\", \"Oracle Cloud (OCI)\"],\n  [\"Dudas n8n\", \"LangGraph\"],\n  [\"Despliegue OCI\", \"Always Free\"],\n  [\"Dudas técnicas\", \"OCI Storage\"],\n  [\"Feedback de cursos\", \"Prompt Engineering\"],\n  [\"Experiencia de aprendizaje\", \"Comunidad\"]\n];\n\nconst tiposEjemplo = [\n  \"testimonio\",\n  \"pregunta_tecnica\",\n  \"logro\",\n  \"duda\",\n  \"feedback\",\n  \"otro\"\n];\n\nreturn items.map((item, index) => {\n  const json = item.json;\n\n  // El nodo anterior entrega \"contenido\".\n  // \"texto\" se conserva como alternativa por compatibilidad.\n  const contenido = String(\n    json.contenido ?? json.texto ?? \"\"\n  ).trim();\n\n  const fragmento = contenido\n    ? contenido.slice(0, 180)\n    : \"Contenido no disponible para la prueba.\";\n\n  const resumen = contenido\n    ? `Análisis simulado de la interacción: ${contenido.slice(0, 120)}`\n    : \"No fue posible generar un resumen porque la actividad no contiene texto.\";\n\n  return {\n    json: {\n      ...json,\n\n      status: \"exito\",\n\n      analisis: {\n        sentimiento: index % 3 === 0\n          ? \"Positivo\"\n          : index % 3 === 1\n            ? \"Neutro\"\n            : \"Negativo\",\n\n        relevancia: [\"Alta\", \"Media\", \"Baja\"][index % 3],\n\n        tipo_insight: tiposEjemplo[\n          index % tiposEjemplo.length\n        ],\n\n        temas: temasEjemplo[\n          index % temasEjemplo.length\n        ],\n\n        resumen,\n\n        evidencia_clave: fragmento\n      }\n    }\n  };\n});\n"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1232,
-        1840
-      ],
-      "id": "5f2019f3-7ab8-4b6d-a72d-96fcae308d3f",
-      "name": "Mock Analista LLM"
-    },
-    {
-      "parameters": {
-        "jsCode": "/**\n * ENSAMBLE PAQUETE DISTRIBUCIÓN — CommunityLab / LinkedIn Prompt V2\n * Acepta salida estructurada directa, wrapper {output: ...},\n * texto JSON en `text`, o arrays de wrappers como los mostrados en pruebas.\n */\nconst contextoBase = $('W4.2. Consolidar Análisis del Lote').first()?.json || {};\nconst itemsEntrada = $input.all();\n\nfunction parseJsonString(value) {\n  if (typeof value !== 'string') return value;\n  const trimmed = value.trim();\n  if (!trimmed) return value;\n  try { return JSON.parse(trimmed); } catch (_) { return value; }\n}\n\nfunction unwrap(value, depth = 0) {\n  if (depth > 6 || value == null) return value;\n  let current = parseJsonString(value);\n  if (Array.isArray(current)) {\n    if (current.length === 1) return unwrap(current[0], depth + 1);\n    return current.map(v => unwrap(v, depth + 1));\n  }\n  if (current && typeof current === 'object') {\n    if (current.output !== undefined) return unwrap(current.output, depth + 1);\n    if (current.result !== undefined && Object.keys(current).length <= 3) return unwrap(current.result, depth + 1);\n    if (current.response !== undefined && Object.keys(current).length <= 3) return unwrap(current.response, depth + 1);\n    if (current.text !== undefined && !current.titulo && !current.copy) {\n      const parsedText = parseJsonString(current.text);\n      if (parsedText !== current.text) return unwrap(parsedText, depth + 1);\n    }\n  }\n  return current;\n}\n\nfunction isLinkedInAsset(value) {\n  return value && typeof value === 'object' && (\n    'titulo' in value || 'copy' in value || 'tipo_experiencia' in value || 'omitido' in value\n  );\n}\n\nfunction normalizeLinkedIn(value) {\n  if (!isLinkedInAsset(value)) return null;\n  const asset = {\n    titulo: typeof value.titulo === 'string' ? value.titulo : '',\n    copy: typeof value.copy === 'string' ? value.copy : '',\n    canal_recomendado: value.canal_recomendado || 'LinkedIn Oficial',\n    potencial_engagement: ['Alto', 'Medio', 'Bajo'].includes(value.potencial_engagement) ? value.potencial_engagement : 'Bajo',\n    hashtags: Array.isArray(value.hashtags) ? value.hashtags : [],\n    origen_interacciones: Array.isArray(value.origen_interacciones) ? value.origen_interacciones : [],\n    tipo_experiencia: value.tipo_experiencia || null\n  };\n  if (value.omitido === true) {\n    asset.omitido = true;\n    asset.motivo = typeof value.motivo === 'string' ? value.motivo : 'No hay material utilizable para redactar un post fiel.';\n  }\n  return asset;\n}\n\nlet postLinkedin = { status: 'no_requerido' };\nlet sugerenciaFAQ = { status: 'no_requerido' };\n\nfor (const item of itemsEntrada) {\n  const datosOriginales = item?.json ?? {};\n  const datos = unwrap(datosOriginales);\n  const candidatos = Array.isArray(datos) ? datos : [datos];\n  for (const candidato of candidatos) {\n    const linkedin = normalizeLinkedIn(candidato);\n    if (linkedin) {\n      postLinkedin = linkedin.omitido\n        ? { ...linkedin, status: 'omitido' }\n        : linkedin;\n    } else if (candidato && typeof candidato === 'object' && (\n      'tema' in candidato || 'contenido_sugerido' in candidato || 'origen' in candidato\n    )) {\n      sugerenciaFAQ = candidato;\n    }\n  }\n}\n\nconst fechaISO = new Date().toISOString();\nconst timestamp = fechaISO.replace(/[:.-]/g, '');\nconst periodoRef = String(contextoBase.periodo_referencia || 'semana_actual').toLowerCase().replace(/\\s+/g, '_');\nconst rutaObjetoOCI = `activos/${periodoRef}/paquete-${timestamp}.json`;\nconst activos = {};\n// Se conserva el activo omitido en el paquete para dejar trazabilidad, pero se excluye de la curaduría/BD.\nif (postLinkedin.status !== 'no_requerido' || postLinkedin.omitido === true) activos.post_linkedin = postLinkedin;\nif (sugerenciaFAQ.status !== 'no_requerido') activos.sugerencia_contenido_faq = sugerenciaFAQ;\n\nconst paqueteFinal = {\n  status: 'exito',\n  id_lote: contextoBase.id_lote ?? null,\n  origen_comunidad: contextoBase.origen_comunidad || 'Comunidad_General',\n  periodo_referencia: contextoBase.periodo_referencia || 'Semana_Actual',\n  resumen_comunidad: contextoBase.resumen_comunidad || {},\n  activos_distribucion_generados: activos,\n  meta: {\n    procesado_en: fechaISO,\n    modo: 'solo_oci',\n    workflow_execution_id: $execution.id || 'ejecucion_local'\n  }\n};\nreturn [{ json: paqueteFinal }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3760,
+        3904,
         1072
       ],
       "id": "55d4ece1-3fa3-4a13-bbfb-1f47d5806c4e",
@@ -165,7 +139,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4000,
+        4144,
         1072
       ],
       "id": "29ceecfb-320b-43df-97d6-348045409dfa",
@@ -312,19 +286,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Script rápido para el output final si se añade un nodo Code tras OCI\nconst entrada = $input.first().json;\n\nentrada.decisiones_branching.generar_linkedin = true;\nentrada.decisiones_branching.generar_newsletter = true;\nentrada.decisiones_branching.generar_faq = true;\n\nreturn [{ json: entrada }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1520,
-        1856
-      ],
-      "id": "239ad0b6-1393-4164-97c5-d7d2c93ab1d6",
-      "name": "Mock Generacion de Activos"
-    },
-    {
-      "parameters": {
         "options": {
           "temperature": 0.5
         }
@@ -367,7 +328,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4288,
+        4432,
         1072
       ],
       "id": "a4786231-aa35-43b9-b203-df8a6a5539fb",
@@ -388,7 +349,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4512,
+        4656,
         1072
       ],
       "id": "00db13a9-ace6-41b9-aa50-b290593dca03",
@@ -409,7 +370,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4736,
+        4880,
         1072
       ],
       "id": "dc4f3b2a-9184-4992-bf9b-59910ffb3009",
@@ -471,7 +432,7 @@
       "parameters": {
         "content": "# 🟩 FASE 3: EVALUACIÓN DE EVIDENCIAS Y GENERACIÓN DE CONTENIDO\n\n## Propósito\nClasificar las evidencias del lote y decidir qué tipos de activos se solicitan, ya sea por reglas automáticas o por `opciones.generar_activos`.\n\n## Evaluación de evidencias\n`Evaluador de Activos (Branching)` examina los análisis consolidados y separa:\n- `evidencias.testimonios_logros`: insights de tipo testimonio/logro con sentimiento positivo.\n- `evidencias.preguntas_dudas`: insights que corresponden a preguntas o dudas técnicas.\n\nSi no se especifica una lista válida en `opciones.generar_activos`, las reglas automáticas proponen:\n- LinkedIn y Newsletter cuando existen testimonios/logros positivos.\n- FAQ cuando existen preguntas/dudas.\n\nSi se informa `opciones.generar_activos`, el evaluador filtra los valores admitidos (`LINKEDIN`, `NEWSLETTER`, `FAQ`) y utiliza ese conjunto como selección explícita.\n\n## Ruta conectada en esta versión\n- `Generador de Post para LinkedIn`: redacta una publicación a partir de las evidencias disponibles, con reglas de fidelidad al mensaje original.\n- `Sin activos - continuar`: emite un marcador cuando ninguna bandera de generación está activa para que el flujo pueda continuar sin contenido generado.\n\n## Importante: alcance implementado\nAunque el evaluador calcula banderas para LinkedIn, Newsletter y FAQ, en las conexiones de este archivo solo aparece conectado el generador de LinkedIn. No se observan generadores conectados para Newsletter ni FAQ en esta versión. La documentación no debe dar por implementadas esas dos rutas hasta que se incorporen y conecten sus nodos.\n\n## Resultado / continuidad\nEl contenido generado (o el marcador de ausencia de activos) pasa a `Ensamble Paquete Distribución`.",
         "height": 1408,
-        "width": 1536,
+        "width": 1680,
         "color": "#172B1B"
       },
       "type": "n8n-nodes-base.stickyNote",
@@ -492,28 +453,12 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        3600,
+        3744,
         0
       ],
       "typeVersion": 1,
       "id": "9f0250dd-ccd4-44bc-b66c-71ea9cab2784",
       "name": "Sticky Note3"
-    },
-    {
-      "parameters": {
-        "content": "# 🟧 NODOS MOCK PARA DESARROLLO Y PRUEBAS\n\n## Propósito\nMantener alternativas de prueba para ensayar partes del procesamiento sin depender siempre de la respuesta real del modelo de lenguaje.\n\n## Mocks identificados\n- `Mock Analista LLM`: produce resultados analíticos simulados.\n- `Mock Generacion de Activos`: simula decisiones/resultados para probar escenarios de selección de activos.\n\n## Estado de conexión\nEn el JSON revisado, ambos nodos mock aparecen sin conexiones de salida en la ruta principal. Por tanto, no sustituyen automáticamente a los nodos reales ni están integrados en la ejecución activa. Para usarlos, hay que conectarlos explícitamente o activar una ruta de prueba separada y controlada.\n\n## No asumir\nLa versión actual de este workflow no contiene un nodo `Mock Subida OCI` ni una ruta conectada de subida OCI. Tampoco se observa aquí la secuencia de respuesta HTTP descrita en documentación anterior.\n\n## Recomendación de uso\nAntes de una prueba, verificar qué ruta está conectada y qué nodos están habilitados. Los mocks deben devolver la misma estructura que esperan los nodos siguientes para que la prueba sea representativa.",
-        "height": 452,
-        "width": 1920,
-        "color": "#A93D3D"
-      },
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        0,
-        1760
-      ],
-      "id": "05dc5284-c494-41f8-915a-721307690e5c",
-      "name": "Sticky Note - Mocks y Merge"
     },
     {
       "parameters": {
@@ -582,7 +527,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4000,
+        4144,
         1296
       ],
       "id": "f48f8111-b15a-401c-a23c-35a50e0132cd",
@@ -594,35 +539,105 @@
           "name": "Postgres account 5"
         }
       }
-    }
-  ],
-  "pinData": {
-    "Generador de Post para LinkedIn": [
-      {
-        "json": {
-          "output": {
-            "titulo": "Primera entrevista técnica y el dominio de LangGraph",
-            "copy": "Primera entrevista técnica: un hito que se celebra.\n\nLaura Gómez nos compartió que consiguió su primera entrevista técnica tras completar el módulo de agentes. Durante el proceso, le preguntaron por LangGraph y pudo explicar el grafo de estados sin inconvenientes.\n\n\"¡Logré mi primera entrevista técnica gracias al módulo de agentes!\", nos contó con entusiasmo. Este avance refleja cómo el estudio constante permite comunicar conceptos complejos con seguridad frente a un reclutador.\n\nSabemos que el camino del aprendizaje técnico tiene sus retos, pero ver estos resultados nos motiva a seguir. ¡Mucho éxito en los siguientes pasos, Laura! 💪\n\nSi tú también estás preparándote para tu primera entrevista, cuéntanos qué tema te genera más curiosidad.",
-            "canal_recomendado": "LinkedIn Oficial",
-            "potencial_engagement": "Alto",
-            "hashtags": [
-              "#LangGraph",
-              "#IA",
-              "#EntrevistaTécnica",
-              "#ComunidadTech"
-            ],
-            "origen_interacciones": [
-              "Laura Gómez"
-            ],
-            "tipo_experiencia": "logro_laboral"
-          }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "447ae1ca-c712-4392-b2b8-40e1fe8d93af",
+              "leftValue": "={{ $('Evaluador de Activos (Branching)').first().json.decisiones_branching.generar_faq }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
         },
-        "pairedItem": {
-          "item": 0
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3216,
+        1056
+      ],
+      "id": "fc2d4039-1501-4fbb-b880-b8f8ba835fea",
+      "name": "¿Generar FAQ?"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Genera la sugerencia de FAQ o Tip a partir de este lote de la comunidad:\n\n{{ JSON.stringify($('Evaluador de Activos (Branching)').first().json, null, 2) }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Eres el editor de contenido educativo de una comunidad de aprendizaje en tecnología (programa ONE). Conviertes dudas reales de la comunidad en borradores de FAQs y Tips rápidos que una persona del equipo revisará antes de publicarlos. Tu prioridad es la corrección: una respuesta técnica incorrecta es peor que ninguna respuesta.\n\nDATOS DE ENTRADA\nRecibirás un JSON con el lote de la comunidad:\n- origen_comunidad, id_lote o periodo_referencia\n- opciones (opcional): idioma y tono\n- resumen_comunidad: total_interacciones_procesadas y temas_principales\n- evidencias.preguntas_dudas: lista de { autor, texto_original } (y canal, si viene)\n- evidencias.testimonios_logros: no los uses para este activo\n\nQUÉ HACER\n1. Elige UNA duda de evidencias.preguntas_dudas: la que más pueda ayudar a otras personas de la comunidad y pueda responderse con orientación general. Las demás no se incluyen.\n2. Decide el formato:\n   - FAQ: la duda es una pregunta directa (\"¿cómo...?\", \"¿cuál es la diferencia...?\") con una respuesta general clara.\n   - TIP: la duda describe una situación práctica y lo más útil es una recomendación breve y accionable.\n   - Derivación: si responder exige diagnosticar el entorno, el código, la configuración o el error concreto de la persona, o si no puedes responder con seguridad, no improvises: usa status \"derivado_a_mentoria\" y formato \"NINGUNO\".\n3. Redacta contenido_sugerido SIN nombres de personas, para que sirva a cualquier miembro de la comunidad. Separa los bloques con \\n\\n:\n   - FAQ: \"Pregunta: ...\\n\\nRespuesta: ...\\n\\nPara profundizar: ...\"\n   - TIP: \"Tip rápido: ...\\n\\nPor qué importa: ...\\n\\nQué probar: ...\"\n   - Derivación: \"Resumen para mentoría: ...\\n\\nDatos útiles para diagnosticar: ...\"\n\nCORRECCIÓN Y FIDELIDAD (obligatorias)\n- Usa solo orientación general, estable y ampliamente conocida. No incluyas código, comandos, nombres de funciones, parámetros, paquetes, versiones ni enlaces. Sí puedes nombrar la herramienta o el servicio que menciona la duda (por ejemplo, OCI Object Storage) y orientar a su documentación.\n- Presenta las causas como posibles (\"una causa habitual es...\", \"conviene revisar...\"), nunca como diagnóstico de lo que le pasa a la persona.\n- Si no estás seguro de la respuesta, deriva a mentoría en lugar de improvisar.\n- Lo que la persona dice haber observado (por ejemplo, \"la mayoría de los ejemplos que veo usan X\") es su percepción: no lo presentes como un hecho general.\n- No inventes datos de la duda (herramientas, canales, contexto) que no estén en texto_original ni en el lote.\n- El nombre del canal solo indica dónde se publicó la duda. No asumas por él la herramienta, el lenguaje ni el framework: si texto_original no los menciona, responde con orientación general y, en \"Para profundizar\", sugiere revisar la documentación de la herramienta que la persona esté usando.\n- No llames \"frecuente\" ni \"recurrente\" a una duda, salvo que dos o más personas del lote la planteen o la persona diga que ya la había preguntado antes (en ese caso, indícalo tal como lo dijo).\n- No afirmes que el contenido está verificado u oficial; es un borrador para revisión. En \"Para profundizar\" indica qué buscar en la documentación de la herramienta, sin dar enlaces.\n\nESTILO\n- Didáctico, claro y cercano. Idioma: el indicado en opciones.idioma; si no viene, español.\n- contenido_sugerido: entre 50 y 140 palabras.\n- tema: máximo 90 caracteres. Empieza con \"FAQ: \" si es FAQ, con \"Tip rápido: \" si es TIP y con \"Consulta para mentoría: \" si es derivación.\n- origen: \"Duda planteada por {autor}\". Agrega \" en {canal}\" solo si el canal viene en los datos. Si la persona dijo que ya había preguntado antes, agrégalo al final (por ejemplo: \"; indicó que ya lo había preguntado antes\").\n\nFORMATO DE SALIDA\nResponde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni bloques de código:\n{\n  \"tema\": \"string\",\n  \"origen\": \"string\",\n  \"status\": \"borrador_para_curaduria | derivado_a_mentoria\",\n  \"contenido_sugerido\": \"string\",\n  \"formato\": \"FAQ | TIP | NINGUNO\"\n}\n\nSIN MATERIAL UTILIZABLE\nSi preguntas_dudas está vacío o no viene, responde con tema, origen y contenido_sugerido vacíos, status \"omitido\", formato \"NINGUNO\", \"omitido\": true y \"motivo\" con una frase breve que explique por qué.\n\nEJEMPLOS\n\nEjemplo 1\nEntrada (fragmento):\nevidencias.preguntas_dudas = [{\"autor\": \"Sara Linares\", \"texto_original\": \"¿Cuál es la diferencia entre un embedding y un modelo de lenguaje? Me confundo en el módulo de RAG.\"}]\nSalida:\n{\"tema\": \"FAQ: Diferencia entre embeddings y modelos de lenguaje en RAG\", \"origen\": \"Duda planteada por Sara Linares\", \"status\": \"borrador_para_curaduria\", \"contenido_sugerido\": \"Pregunta: ¿Qué diferencia hay entre un embedding y un modelo de lenguaje en un sistema RAG?\\n\\nRespuesta: Un embedding convierte un texto en una lista de números que permite medir qué tan parecido es a otros textos; sirve para buscar los fragmentos más relevantes. Un modelo de lenguaje, en cambio, genera texto. En RAG se usan juntos: primero se recuperan los fragmentos más parecidos a la pregunta y luego el modelo de lenguaje redacta la respuesta apoyándose en ellos.\\n\\nPara profundizar: busca en la documentación de tu herramienta de RAG los conceptos de recuperación de fragmentos y de búsqueda por similitud.\", \"formato\": \"FAQ\"}\n\nEjemplo 2\nEntrada (fragmento):\nevidencias.preguntas_dudas = [{\"autor\": \"Mateo Rivas\", \"texto_original\": \"Mis prompts a veces devuelven formatos distintos y me rompen el flujo de automatización. ¿Qué hacen ustedes?\"}]\nSalida:\n{\"tema\": \"Tip rápido: Respuestas con formato consistente en tus prompts\", \"origen\": \"Duda planteada por Mateo Rivas\", \"status\": \"borrador_para_curaduria\", \"contenido_sugerido\": \"Tip rápido: Pide el formato de salida de forma explícita y dale un ejemplo.\\n\\nPor qué importa: cuando el modelo no sabe exactamente qué estructura esperas, puede variar la forma de responder de una ejecución a otra, y eso rompe los pasos siguientes de tu flujo.\\n\\nQué probar: indica el formato exacto (por ejemplo, un JSON con los campos que necesitas), incluye un ejemplo de salida correcta, baja la temperatura del modelo para ganar consistencia y valida la respuesta antes de pasarla al siguiente paso.\", \"formato\": \"TIP\"}\n\nEjemplo 3\nEntrada (fragmento):\nevidencias.preguntas_dudas = [{\"autor\": \"Lucía Ortega\", \"texto_original\": \"Mi flujo falla con un error 401 al conectar con una API y ya revisé todo, no sé qué más hacer.\"}]\nSalida:\n{\"tema\": \"Consulta para mentoría: error 401 al conectar con una API\", \"origen\": \"Duda planteada por Lucía Ortega\", \"status\": \"derivado_a_mentoria\", \"contenido_sugerido\": \"Resumen para mentoría: la persona obtiene un error 401 al conectar su flujo con una API y indica que ya revisó la configuración.\\n\\nDatos útiles para diagnosticar: herramienta o servicio que se conecta, mensaje de error completo, qué pasos de revisión ya se hicieron y si el mismo acceso funciona desde otra herramienta.\", \"formato\": \"NINGUNO\"}\n```"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        3456,
+        1040
+      ],
+      "id": "d221733b-b8d9-40de-b69f-489c9290d57a",
+      "name": "Generador de FAQ",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "notes": "Prompt: prompts/system_prompt_faq_tips.md v1.1"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"tema\": { \"type\": \"string\" },\n    \"origen\": { \"type\": \"string\" },\n    \"status\": {\n      \"type\": \"string\",\n      \"enum\": [\"borrador_para_curaduria\", \"derivado_a_mentoria\", \"omitido\"]\n    },\n    \"contenido_sugerido\": { \"type\": \"string\" },\n    \"formato\": { \"type\": \"string\", \"enum\": [\"FAQ\", \"TIP\", \"NINGUNO\"] },\n    \"omitido\": { \"type\": \"boolean\" },\n    \"motivo\": { \"type\": \"string\" }\n  },\n  \"required\": [\"tema\", \"origen\", \"status\", \"contenido_sugerido\", \"formato\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3600,
+        1200
+      ],
+      "id": "0e08184e-ac1e-4386-8a23-bd6fa2f08813",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        3456,
+        1200
+      ],
+      "id": "1b56df08-983a-42ad-a954-cf3e827e713d",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "B3taNTYHxUbVSxWW",
+          "name": "Google Gemini(PaLM) Api account 2"
         }
       }
-    ]
-  },
+    }
+  ],
+  "pinData": {},
   "connections": {
     "Analista de Contenido (LLM)": {
       "main": [
@@ -639,11 +654,6 @@
       "main": [
         [
           {
-            "node": "Sin activos - continuar",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "¿Generar LinkedIn?",
             "type": "main",
             "index": 0
@@ -655,18 +665,7 @@
       "main": [
         [
           {
-            "node": "Ensamble Paquete Distribución",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sin activos - continuar": {
-      "main": [
-        [
-          {
-            "node": "Ensamble Paquete Distribución",
+            "node": "¿Generar FAQ?",
             "type": "main",
             "index": 0
           }
@@ -878,6 +877,64 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "¿Generar FAQ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Generar FAQ?": {
+      "main": [
+        [
+          {
+            "node": "Generador de FAQ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ensamble Paquete Distribución",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generador de FAQ": {
+      "main": [
+        [
+          {
+            "node": "Ensamble Paquete Distribución",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generador de FAQ",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generador de FAQ",
+            "type": "ai_languageModel",
+            "index": 0
+          }
         ]
       ]
     }
@@ -887,7 +944,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "80e9af94-2c67-46df-80e1-e8b8ca95b2be",
+  "versionId": "270a4802-4152-4497-a791-4de570b08a34",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "cd546de4ce458027fb927d9954a78c4fbfb8161ef740386b3d43e435430e781c"
