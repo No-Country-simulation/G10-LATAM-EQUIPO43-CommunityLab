@@ -155,8 +155,26 @@ def check_db_status():
 # ==============================================================================
 # 4. FUNCIONES DE ACCESO Y ACTUALIZACIÓN DE DATOS
 # ==============================================================================
-def fetch_activos(estado_filtro="borrador"):
-    """Consulta activos en 'activo_generado' junto con información de su lote."""
+def fetch_lotes_con_activos():
+    """Consulta los IDs de lote disponibles en 'activo_generado' ordenados del más reciente al más antiguo."""
+    query = """
+        SELECT
+            ag.id_lote,
+            MAX(lp.periodo_referencia) AS periodo_referencia,
+            COUNT(*) AS total_activos
+        FROM activo_generado ag
+        LEFT JOIN lote_procesamiento lp ON lp.id_lote = ag.id_lote
+        GROUP BY ag.id_lote
+        ORDER BY ag.id_lote DESC;
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query)
+            return cur.fetchall()
+
+
+def fetch_activos(estado_filtro="borrador", id_lote_filtro=None):
+    """Consulta activos en 'activo_generado' junto con información de su lote, autor y canal original de Discord."""
     query = """
         SELECT
             ag.id_activo,
@@ -170,15 +188,33 @@ def fetch_activos(estado_filtro="borrador"):
             ag.actualizado_en,
             lp.periodo_referencia,
             lp.sentimiento_predominante,
-            f.nombre AS origen_comunidad
+            f.nombre AS origen_comunidad,
+            (
+                SELECT string_agg(DISTINCT au.nombre, ', ')
+                FROM actividad a
+                JOIN autor au ON au.id_autor = a.id_autor
+                WHERE a.id_lote = ag.id_lote
+            ) AS autor_discord,
+            (
+                SELECT string_agg(DISTINCT c.nombre, ', ')
+                FROM actividad a
+                JOIN canal c ON c.id_canal = a.id_canal
+                WHERE a.id_lote = ag.id_lote
+            ) AS canal_discord
         FROM activo_generado ag
         LEFT JOIN lote_procesamiento lp ON lp.id_lote = ag.id_lote
         LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
     """
+    conditions = []
     params = []
     if estado_filtro != "TODOS":
-        query += " WHERE ag.estado_curaduria = %s"
+        conditions.append("ag.estado_curaduria = %s")
         params.append(estado_filtro)
+    if id_lote_filtro is not None:
+        conditions.append("ag.id_lote = %s")
+        params.append(id_lote_filtro)
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY ag.id_activo DESC;"
 
     with get_connection() as conn:
@@ -269,8 +305,9 @@ def actualizar_estado_activo(
 ):
     """
     Ejecuta UPDATE en 'activo_generado' guardando el contenido editado (titulo y copy)
-    y actualizando 'estado_curaduria' ('aprobado' o 'rechazado').
-    Compatible con Esquema v1, v2 y v3.1 (registra versión en version_activo y cola OCI si aplica).
+    y actualizando 'estado_curaduria' ('aprobado' o 'rechazado') con revisado_en = NOW().
+    Registra la versión correspondiente en 'version_activo' y encola en 'almacenamiento_oci'
+    mediante verificación previa con SELECT (sin usar ON CONFLICT que pueda fallar).
     """
     contenido_actualizado = build_updated_contenido(
         tipo_activo, contenido_original, nuevo_titulo, nuevo_copy
@@ -299,6 +336,13 @@ def actualizar_estado_activo(
                 """
             )
             has_v31_oci = cur.fetchone()[0]
+
+            cur.execute(
+                "SELECT id_lote FROM activo_generado WHERE id_activo = %s LIMIT 1;",
+                (id_activo,),
+            )
+            row_activo = cur.fetchone()
+            id_lote_activo = row_activo[0] if row_activo else None
 
             if has_v2:
                 cur.execute(
@@ -344,17 +388,58 @@ def actualizar_estado_activo(
                             id_activo,
                         ),
                     )
-                    # En v3.1, aprobar un activo encola la versión en almacenamiento_oci para el worker OCI de n8n
+                    # Encolar en almacenamiento_oci con verificación previa SELECT (sin ON CONFLICT)
+                    ruta_obj = f"activos/{id_activo}/versiones/v{next_ver}/activo-{id_activo}-version-{id_version_nueva}.json"
                     if has_v31_oci:
-                        ruta_obj = f"activos/{id_activo}/versiones/v{next_ver}/activo-{id_activo}-version-{id_version_nueva}.json"
                         cur.execute(
-                            """
-                            INSERT INTO almacenamiento_oci (id_version, bucket, ruta_objeto, status)
-                            VALUES (%s, %s, %s, 'pendiente')
-                            ON CONFLICT (id_version) DO NOTHING;
-                            """,
-                            (id_version_nueva, DEFAULT_OCI_BUCKET, ruta_obj),
+                            "SELECT id_almacenamiento FROM almacenamiento_oci WHERE id_version = %s LIMIT 1;",
+                            (id_version_nueva,),
                         )
+                        existing_oci = cur.fetchone()
+                        if existing_oci:
+                            cur.execute(
+                                """
+                                UPDATE almacenamiento_oci
+                                SET bucket = %s,
+                                    ruta_objeto = %s,
+                                    actualizado_en = NOW()
+                                WHERE id_almacenamiento = %s;
+                                """,
+                                (DEFAULT_OCI_BUCKET, ruta_obj, existing_oci[0]),
+                            )
+                        else:
+                            cur.execute(
+                                """
+                                INSERT INTO almacenamiento_oci (id_version, bucket, ruta_objeto, status)
+                                VALUES (%s, %s, %s, 'pendiente');
+                                """,
+                                (id_version_nueva, DEFAULT_OCI_BUCKET, ruta_obj),
+                            )
+                    elif id_lote_activo is not None:
+                        cur.execute(
+                            "SELECT id_almacenamiento FROM almacenamiento_oci WHERE id_lote = %s LIMIT 1;",
+                            (id_lote_activo,),
+                        )
+                        existing_oci = cur.fetchone()
+                        if existing_oci:
+                            cur.execute(
+                                """
+                                UPDATE almacenamiento_oci
+                                SET bucket = %s,
+                                    ruta_objeto = %s,
+                                    actualizado_en = NOW()
+                                WHERE id_almacenamiento = %s;
+                                """,
+                                (DEFAULT_OCI_BUCKET, ruta_obj, existing_oci[0]),
+                            )
+                        else:
+                            cur.execute(
+                                """
+                                INSERT INTO almacenamiento_oci (id_lote, bucket, ruta_objeto, status)
+                                VALUES (%s, %s, %s, 'pendiente');
+                                """,
+                                (id_lote_activo, DEFAULT_OCI_BUCKET, ruta_obj),
+                            )
                 else:
                     cur.execute(
                         """
@@ -393,6 +478,32 @@ def actualizar_estado_activo(
                         id_activo,
                     ),
                 )
+                if nuevo_estado == "aprobado" and id_lote_activo is not None:
+                    ruta_obj = f"activos/lote-{id_lote_activo}/activo-{id_activo}-aprobado.json"
+                    cur.execute(
+                        "SELECT id_almacenamiento FROM almacenamiento_oci WHERE id_lote = %s LIMIT 1;",
+                        (id_lote_activo,),
+                    )
+                    existing_oci = cur.fetchone()
+                    if existing_oci:
+                        cur.execute(
+                            """
+                            UPDATE almacenamiento_oci
+                            SET bucket = %s,
+                                ruta_objeto = %s,
+                                actualizado_en = NOW()
+                            WHERE id_almacenamiento = %s;
+                            """,
+                            (DEFAULT_OCI_BUCKET, ruta_obj, existing_oci[0]),
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            INSERT INTO almacenamiento_oci (id_lote, bucket, ruta_objeto, status)
+                            VALUES (%s, %s, %s, 'pendiente');
+                            """,
+                            (id_lote_activo, DEFAULT_OCI_BUCKET, ruta_obj),
+                        )
         conn.commit()
 
 
@@ -458,15 +569,25 @@ def fetch_analisis_interacciones(id_lote: int | None = None):
             return cur.fetchall()
 
 
+def fetch_count_guardados_oci() -> int:
+    """Retorna el número real de paquetes guardados con éxito en 'almacenamiento_oci'."""
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) FROM almacenamiento_oci WHERE status = 'guardado_con_exito';"
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else 0
+
+
 def fetch_almacenamiento_oci():
     """
-    Consulta la tabla 'almacenamiento_oci' adaptándose automáticamente a:
-    - Esquema v1/v2 (donde almacenamiento_oci tiene id_lote)
-    - Esquema v3.1 (donde almacenamiento_oci tiene id_version -> version_activo -> activo_generado)
+    Consulta la tabla 'almacenamiento_oci' real adaptándose automáticamente al esquema:
+    incluye id_almacenamiento, bucket, ruta_objeto, status y fecha de guardado.
     """
     with get_connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
+        with conn.cursor() as cur_check:
+            cur_check.execute(
                 """
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.columns
@@ -476,56 +597,77 @@ def fetch_almacenamiento_oci():
                 );
                 """
             )
-            has_id_version = cur.fetchone()[0]
+            has_id_version = cur_check.fetchone()[0]
 
-            if has_id_version:
-                query = """
-                    SELECT
-                        ao.id_almacenamiento,
-                        ag.id_lote,
-                        ag.id_activo,
-                        ag.tipo_activo,
-                        va.id_version,
-                        va.numero_version,
-                        ao.bucket,
-                        ao.ruta_objeto,
-                        ao.status,
-                        ao.detalle_error,
-                        ao.creado_en,
-                        ao.actualizado_en,
-                        lp.periodo_referencia,
-                        lp.estado AS estado_lote,
-                        lp.total_interacciones,
-                        lp.sentimiento_predominante,
-                        f.nombre AS origen_comunidad
-                    FROM almacenamiento_oci ao
-                    LEFT JOIN version_activo va ON va.id_version = ao.id_version
-                    LEFT JOIN activo_generado ag ON ag.id_activo = va.id_activo
-                    LEFT JOIN lote_procesamiento lp ON lp.id_lote = ag.id_lote
-                    LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
-                    ORDER BY ao.id_almacenamiento DESC;
+            cur_check.execute(
                 """
-            else:
-                query = """
-                    SELECT
-                        ao.id_almacenamiento,
-                        ao.id_lote,
-                        ao.bucket,
-                        ao.ruta_objeto,
-                        ao.status,
-                        ao.detalle_error,
-                        ao.creado_en,
-                        ao.actualizado_en,
-                        lp.periodo_referencia,
-                        lp.estado AS estado_lote,
-                        lp.total_interacciones,
-                        lp.sentimiento_predominante,
-                        f.nombre AS origen_comunidad
-                    FROM almacenamiento_oci ao
-                    LEFT JOIN lote_procesamiento lp ON lp.id_lote = ao.id_lote
-                    LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
-                    ORDER BY ao.id_almacenamiento DESC;
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'almacenamiento_oci'
+                      AND column_name = 'guardado_en'
+                );
                 """
+            )
+            has_guardado_en = cur_check.fetchone()[0]
+
+        expr_fecha = (
+            "COALESCE(ao.guardado_en, ao.actualizado_en, ao.creado_en)"
+            if has_guardado_en
+            else "COALESCE(ao.actualizado_en, ao.creado_en)"
+        )
+
+        if has_id_version:
+            query = f"""
+                SELECT
+                    ao.id_almacenamiento,
+                    COALESCE(ag.id_lote, ao.id_lote) AS id_lote,
+                    ag.id_activo,
+                    ag.tipo_activo,
+                    va.id_version,
+                    va.numero_version,
+                    ao.bucket,
+                    ao.ruta_objeto,
+                    ao.status,
+                    {expr_fecha} AS fecha_guardado,
+                    ao.detalle_error,
+                    ao.creado_en,
+                    ao.actualizado_en,
+                    lp.periodo_referencia,
+                    lp.estado AS estado_lote,
+                    lp.total_interacciones,
+                    lp.sentimiento_predominante,
+                    f.nombre AS origen_comunidad
+                FROM almacenamiento_oci ao
+                LEFT JOIN version_activo va ON va.id_version = ao.id_version
+                LEFT JOIN activo_generado ag ON ag.id_activo = va.id_activo
+                LEFT JOIN lote_procesamiento lp ON lp.id_lote = COALESCE(ag.id_lote, ao.id_lote)
+                LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
+                ORDER BY ao.id_almacenamiento DESC;
+            """
+        else:
+            query = f"""
+                SELECT
+                    ao.id_almacenamiento,
+                    ao.id_lote,
+                    ao.bucket,
+                    ao.ruta_objeto,
+                    ao.status,
+                    {expr_fecha} AS fecha_guardado,
+                    ao.detalle_error,
+                    ao.creado_en,
+                    ao.actualizado_en,
+                    lp.periodo_referencia,
+                    lp.estado AS estado_lote,
+                    lp.total_interacciones,
+                    lp.sentimiento_predominante,
+                    f.nombre AS origen_comunidad
+                FROM almacenamiento_oci ao
+                LEFT JOIN lote_procesamiento lp ON lp.id_lote = ao.id_lote
+                LEFT JOIN fuente f ON f.id_fuente = lp.id_fuente
+                ORDER BY ao.id_almacenamiento DESC;
+            """
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(query)
             return cur.fetchall()
 
@@ -822,33 +964,34 @@ def seed_datos_demo():
                         (id_ver, id_activo_ins),
                     )
 
-            # 4. Registro de persistencia en OCI Object Storage
+            # 4. Registro de persistencia en OCI Object Storage (verificación previa SELECT, sin ON CONFLICT)
+            ruta_seed = f"activos/2026-semana-04/lote-{id_lote}-paquete-distribucion.json"
             if has_v31_oci and primer_id_version is not None:
                 cur.execute(
-                    """
-                    INSERT INTO almacenamiento_oci (id_version, bucket, ruta_objeto, status)
-                    VALUES (%s, %s, %s, 'guardado_con_exito')
-                    ON CONFLICT (id_version) DO NOTHING;
-                    """,
-                    (
-                        primer_id_version,
-                        DEFAULT_OCI_BUCKET,
-                        f"activos/2026-semana-04/lote-{id_lote}-paquete-distribucion.json",
-                    ),
+                    "SELECT id_almacenamiento FROM almacenamiento_oci WHERE id_version = %s LIMIT 1;",
+                    (primer_id_version,),
                 )
+                if not cur.fetchone():
+                    cur.execute(
+                        """
+                        INSERT INTO almacenamiento_oci (id_version, bucket, ruta_objeto, status)
+                        VALUES (%s, %s, %s, 'guardado_con_exito');
+                        """,
+                        (primer_id_version, DEFAULT_OCI_BUCKET, ruta_seed),
+                    )
             elif not has_v31_oci:
                 cur.execute(
-                    """
-                    INSERT INTO almacenamiento_oci (id_lote, bucket, ruta_objeto, status)
-                    VALUES (%s, %s, %s, 'guardado_con_exito')
-                    ON CONFLICT (id_lote) DO NOTHING;
-                    """,
-                    (
-                        id_lote,
-                        DEFAULT_OCI_BUCKET,
-                        f"activos/2026-semana-04/lote-{id_lote}-paquete-distribucion.json",
-                    ),
+                    "SELECT id_almacenamiento FROM almacenamiento_oci WHERE id_lote = %s LIMIT 1;",
+                    (id_lote,),
                 )
+                if not cur.fetchone():
+                    cur.execute(
+                        """
+                        INSERT INTO almacenamiento_oci (id_lote, bucket, ruta_objeto, status)
+                        VALUES (%s, %s, %s, 'guardado_con_exito');
+                        """,
+                        (id_lote, DEFAULT_OCI_BUCKET, ruta_seed),
+                    )
         conn.commit()
 
 
@@ -974,30 +1117,69 @@ tab_curaduria, tab_metricas, tab_oci = st.tabs(
 # PESTAÑA 1: PANEL DE CURADURÍA (HUMAN-IN-THE-LOOP)
 # ------------------------------------------------------------------------------
 with tab_curaduria:
-    col_head, col_filter = st.columns([3, 1])
-    with col_head:
-        st.subheader("📋 Bandeja de Curaduría de Activos Generados por IA")
-        st.caption(
-            "Revisa, edita el título y copy persuasivo de cada activo en estado `borrador`, "
-            "y aprueba su publicación o recházalo."
+    st.subheader("📋 Bandeja de Curaduría de Activos Generados por IA")
+    st.caption(
+        "Revisa, edita el título y copy persuasivo de cada activo en estado `borrador`, "
+        "y aprueba su publicación o recházalo."
+    )
+
+    try:
+        lotes_activos_rows = fetch_lotes_con_activos()
+    except Exception:
+        lotes_activos_rows = []
+
+    lote_mas_reciente_id = (
+        lotes_activos_rows[0]["id_lote"] if lotes_activos_rows else 30
+    )
+    opcion_lote_reciente = f"Lote más reciente (Lote #{lote_mas_reciente_id})"
+    opcion_todos_lotes = "Mostrar todos los lotes (Histórico)"
+
+    mapa_opciones_lote = {
+        opcion_lote_reciente: lote_mas_reciente_id,
+        opcion_todos_lotes: None,
+    }
+    for row_l in lotes_activos_rows:
+        lid = row_l["id_lote"]
+        if lid != lote_mas_reciente_id:
+            per = row_l.get("periodo_referencia") or "Sin período"
+            label_lote = f"Lote #{lid} · {per}"
+            mapa_opciones_lote[label_lote] = lid
+
+    col_filter_lote, col_filter_estado = st.columns([2, 1])
+    with col_filter_lote:
+        seleccion_lote_label = st.selectbox(
+            "Filtrar activos por Lote de Procesamiento:",
+            options=list(mapa_opciones_lote.keys()),
+            index=0,
         )
-    with col_filter:
+    with col_filter_estado:
         filtro_estado = st.selectbox(
             "Filtrar por estado de curaduría:",
             options=["borrador", "aprobado", "rechazado", "TODOS"],
             index=0,
         )
 
+    id_lote_seleccionado = mapa_opciones_lote.get(seleccion_lote_label)
+
     try:
-        activos = fetch_activos(estado_filtro=filtro_estado)
+        activos = fetch_activos(
+            estado_filtro=filtro_estado,
+            id_lote_filtro=id_lote_seleccionado,
+        )
     except Exception as exc:
         st.error(f"No se pudo consultar la tabla `activo_generado`: {exc}")
         activos = []
 
     if not activos:
+        lote_msg = (
+            f"en el **Lote #{id_lote_seleccionado}**"
+            if id_lote_seleccionado is not None
+            else "en el **histórico de lotes**"
+        )
         st.info(
-            f"No hay activos en estado **'{filtro_estado}'** actualmente en la base de datos. "
-            "Puedes ejecutar el workflow de n8n o pulsar **'🌱 Poblar Lote Demo (Seed)'** en el panel lateral."
+            f"No hay activos en estado **'{filtro_estado}'** {lote_msg}. "
+            "Puedes cambiar el filtro de lote a **'Mostrar todos los lotes (Histórico)'**, "
+            "cambiar el estado a **'aprobado' / 'TODOS'**, o pulsar **'🌱 Poblar Lote Demo (Seed)'** en el panel lateral."
         )
     else:
         c1, c2, c3, c4 = st.columns(4)
@@ -1029,7 +1211,7 @@ with tab_curaduria:
             tipo = activo["tipo_activo"]
             estado = activo["estado_curaduria"]
             periodo = activo.get("periodo_referencia") or f"Lote #{id_lote}"
-            comunidad = activo.get("origen_comunidad") or "Comunidad Digital"
+            comunidad = activo.get("origen_comunidad") or "Discord_Grupo_ONE_G10"
             contenido_raw = activo["contenido"] or {}
             if isinstance(contenido_raw, str):
                 try:
@@ -1037,31 +1219,55 @@ with tab_curaduria:
                 except Exception:
                     contenido_raw = {"copy": contenido_raw}
 
+            # Extraer datos de contexto disponibles: Autor original de Discord, Canal y Lote asociado
+            origen_inter = (
+                contenido_raw.get("origen_interacciones")
+                if isinstance(contenido_raw, dict)
+                else None
+            )
+            autor_fallback = (
+                ", ".join(str(x) for x in origen_inter if x)
+                if isinstance(origen_inter, list) and origen_inter
+                else (str(origen_inter) if origen_inter else None)
+            )
+            autor_original = (
+                activo.get("autor_discord")
+                or autor_fallback
+                or (contenido_raw.get("autor") if isinstance(contenido_raw, dict) else None)
+                or "Miembro de la Comunidad"
+            )
+            canal_original = (
+                activo.get("canal_discord")
+                or (contenido_raw.get("canal_origen") if isinstance(contenido_raw, dict) else None)
+                or "#general"
+            )
+
             titulo_actual, copy_actual = extract_titulo_y_copy(tipo, contenido_raw)
 
             header_expander = (
                 f"{iconos_tipo.get(tipo, tipo)}  |  {titulo_actual}  "
-                f"·  [{estado.upper()}]  ·  (ID #{id_activo} · {periodo})"
+                f"·  [{estado.upper()}]  ·  (Activo #{id_activo} · Lote #{id_lote})"
             )
 
             with st.expander(header_expander, expanded=(estado == "borrador")):
-                meta_col1, meta_col2, meta_col3 = st.columns(3)
-                meta_col1.markdown(f"**🎯 Tipo de Activo:** `{tipo}`")
-                meta_col2.markdown(f"**📦 Lote / Período:** `{periodo}` (`#{id_lote}`)")
-                meta_col3.markdown(f"**🌐 Origen:** `{comunidad}`")
+                meta_col1, meta_col2, meta_col3, meta_col4 = st.columns(4)
+                meta_col1.markdown(f"**👤 Autor original (Discord):** `{autor_original}`")
+                meta_col2.markdown(f"**💬 Canal Discord:** `{canal_original}`")
+                meta_col3.markdown(f"**📦 Lote asociado:** `Lote #{id_lote}` (`{periodo}`)")
+                meta_col4.markdown(f"**🎯 Tipo / Comunidad:** `{tipo}` · `{comunidad}`")
 
                 extras = []
                 if isinstance(contenido_raw, dict):
                     if contenido_raw.get("canal_recomendado"):
                         extras.append(
-                            f"📢 **Canal:** {contenido_raw['canal_recomendado']}"
+                            f"📢 **Canal de Distribución:** {contenido_raw['canal_recomendado']}"
                         )
                     if contenido_raw.get("potencial_engagement"):
                         extras.append(
                             f"🔥 **Engagement estimado:** {contenido_raw['potencial_engagement']}"
                         )
                     if contenido_raw.get("origen"):
-                        extras.append(f"💬 **Origen:** {contenido_raw['origen']}")
+                        extras.append(f"💬 **Detalle Origen:** {contenido_raw['origen']}")
                     if contenido_raw.get("hashtags") and isinstance(
                         contenido_raw["hashtags"], list
                     ):
@@ -1112,7 +1318,7 @@ with tab_curaduria:
                                 comentario=comentario_curador.strip(),
                             )
                             st.toast(
-                                f"Activo #{id_activo} ({tipo}) aprobado y guardado.",
+                                f"Activo #{id_activo} ({tipo}) aprobado y registrado para OCI.",
                                 icon="✅",
                             )
                             st.rerun()
@@ -1307,37 +1513,45 @@ with tab_metricas:
 with tab_oci:
     st.subheader("🪣 Persistencia en OCI Object Storage (Capa Always Free)")
     st.caption(
-        "Verificación y trazabilidad de los paquetes JSON de distribución respaldados en "
+        "Verificación y trazabilidad en vivo de los paquetes JSON de distribución respaldados en "
         "Oracle Cloud Infrastructure Object Storage (`almacenamiento_oci`)."
     )
 
-    # Datos oficiales verificados en OCI Console (Brazil East)
+    # Datos oficiales verificados en OCI Console
     DEFAULT_OCI_BUCKET = "communitylab-activos-marketing"
     OCI_NAMESPACE = "grhxfjzkgrnw"
-    OCI_REGION = "sa-saopaulo-1 (Brazil East)"
+    OCI_REGION = "sa-saopaulo-1"
 
     try:
         registros_oci = fetch_almacenamiento_oci() or []
     except Exception:
         registros_oci = []
 
-    # Obtención segura de datos sin errores de índice
+    try:
+        paquetes_guardados_count = fetch_count_guardados_oci()
+    except Exception:
+        paquetes_guardados_count = len(
+            [r for r in registros_oci if r.get("status") == "guardado_con_exito"]
+        )
+
     ultimo_path = (
         registros_oci[0].get("ruta_objeto")
-        if registros_oci and isinstance(registros_oci[0], dict) and registros_oci[0].get("ruta_objeto")
-        else "activos/2026-semana-04/paquete-distribucion.json"
+        if registros_oci
+        and isinstance(registros_oci[0], dict)
+        and registros_oci[0].get("ruta_objeto")
+        else "Sin paquetes registrados aún"
     )
     ultimo_status = (
         registros_oci[0].get("status")
-        if registros_oci and isinstance(registros_oci[0], dict) and registros_oci[0].get("status")
-        else "guardado_con_exito"
+        if registros_oci
+        and isinstance(registros_oci[0], dict)
+        and registros_oci[0].get("status")
+        else "sin_registros"
     )
-    # Muestra los 5 paquetes reales de la consola si la consulta no trae filas
-    paquetes_count = len(registros_oci) if registros_oci else 5
 
     oci_col1, oci_col2, oci_col3 = st.columns(3)
     oci_col1.metric("🪣 Bucket OCI Configurado", DEFAULT_OCI_BUCKET)
-    oci_col2.metric("📦 Paquetes Respaldados", paquetes_count)
+    oci_col2.metric("📦 Paquetes Guardados con Éxito", paquetes_guardados_count)
     oci_col3.metric("☁️ Último Estado OCI", ultimo_status)
 
     st.markdown(
@@ -1356,7 +1570,7 @@ with tab_oci:
                 <strong>Región:</strong> <span class="oci-code">{OCI_REGION}</span>
             </div>
             <div style="margin-top:0.4rem;">
-                <strong>Path del Paquete JSON:</strong> <span class="oci-code">{ultimo_path}</span>
+                <strong>Último Path del Paquete JSON:</strong> <span class="oci-code">{ultimo_path}</span>
             </div>
         </div>
         """,
@@ -1364,21 +1578,40 @@ with tab_oci:
     )
 
     if not registros_oci:
-        st.success(
-            f"✅ Conexión con OCI verificada. Bucket `{DEFAULT_OCI_BUCKET}` activo en la región `{OCI_REGION}` con paquetes JSON respaldados."
+        st.info(
+            f"ℹ️ Aún no hay paquetes registrados en la tabla `almacenamiento_oci`. "
+            f"Cuando apruebes un activo en el Panel de Curaduría, el flujo de persistencia en n8n "
+            f"lo respaldará automáticamente en el bucket `{DEFAULT_OCI_BUCKET}` (`{OCI_REGION}`)."
         )
     else:
-        st.markdown("#### 📄 Registros en `almacenamiento_oci`")
-        for reg in registros_oci:
+        st.markdown("#### 📊 Tabla de Paquetes Respaldados en `almacenamiento_oci`")
+        filas_tabla_oci = [
+            {
+                "id_almacenamiento": reg.get("id_almacenamiento"),
+                "bucket": reg.get("bucket") or DEFAULT_OCI_BUCKET,
+                "ruta_objeto": reg.get("ruta_objeto"),
+                "status": reg.get("status"),
+                "fecha_guardado": reg.get("fecha_guardado")
+                or reg.get("actualizado_en")
+                or reg.get("creado_en"),
+            }
+            for reg in registros_oci
+        ]
+        df_oci_resumen = pd.DataFrame(filas_tabla_oci)
+        st.dataframe(df_oci_resumen, use_container_width=True, hide_index=True)
+
+        st.markdown("#### 📦 Detalle Expandible de Paquetes Respaldados")
+        for idx, reg in enumerate(registros_oci):
             id_alm = reg.get("id_almacenamiento", 1)
-            id_lote = reg.get("id_lote") or "N/A"
             bucket_db = reg.get("bucket") or DEFAULT_OCI_BUCKET
-            ruta_db = (
-                reg.get("ruta_objeto")
-                or f"activos/lote-{id_lote}/paquete-distribucion.json"
+            ruta_db = reg.get("ruta_objeto") or "N/A"
+            status_db = reg.get("status") or "pendiente"
+            fecha_guardado = (
+                reg.get("fecha_guardado")
+                or reg.get("actualizado_en")
+                or reg.get("creado_en")
+                or "Reciente"
             )
-            status_db = reg.get("status") or "guardado_con_exito"
-            periodo_db = reg.get("periodo_referencia") or f"Lote #{id_lote}"
 
             icono_status = (
                 "🟢"
@@ -1387,30 +1620,26 @@ with tab_oci:
             )
 
             with st.expander(
-                f"{icono_status} Paquete #{id_alm} ({periodo_db}) — Status: {status_db} — Path: {ruta_db}",
-                expanded=True,
+                f"{icono_status} Paquete #{id_alm} · Bucket: {bucket_db} · Status: {status_db} · Path: {ruta_db}",
+                expanded=(idx < 3),
             ):
                 c_b1, c_b2, c_b3 = st.columns(3)
                 c_b1.markdown(
-                    f"**🪣 Bucket (Proyecto):** `{DEFAULT_OCI_BUCKET}`\n\n"
-                    f"**🪣 Bucket (Registro BD):** `{bucket_db}`"
+                    f"**🆔 ID Almacenamiento:** `#{id_alm}`\n\n"
+                    f"**🪣 Bucket:** `{bucket_db}`"
                 )
                 c_b2.markdown(
-                    f"**📂 Path del Paquete JSON (`ruta_objeto`):**\n`{ruta_db}`"
+                    f"**📂 Ruta del Objeto (`ruta_objeto`):**\n`{ruta_db}`"
                 )
                 c_b3.markdown(
-                    f"**📌 Estado Respaldo:** `{status_db}`\n\n"
-                    f"**🕒 Fecha:** `{reg.get('actualizado_en') or reg.get('creado_en') or 'Reciente'}`"
+                    f"**📌 Status:** `{status_db}`\n\n"
+                    f"**🕒 Fecha de Guardado:** `{fecha_guardado}`"
                 )
 
                 if reg.get("detalle_error"):
-                    st.error(f"Detalle de error OCI: {reg['detalle_error']}")
+                    st.warning(f"Detalle registrado: {reg['detalle_error']}")
 
                 st.code(
-                    f"oci://{DEFAULT_OCI_BUCKET}/{ruta_db}",
+                    f"oci://{bucket_db}@{OCI_NAMESPACE}/{ruta_db}",
                     language="bash",
                 )
-
-        st.markdown("#### 📊 Tabla Consolidada `almacenamiento_oci`")
-        df_oci = pd.DataFrame(registros_oci)
-        st.dataframe(df_oci, use_container_width=True, hide_index=True)
